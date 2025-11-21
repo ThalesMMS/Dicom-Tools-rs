@@ -1,4 +1,4 @@
-use dicom::object::open_file;
+use dicom::object::{open_file, InMemDicomObject};
 use dicom::core::{DataElement, Tag, VR};
 use dicom::core::header::Header;
 use dicom::core::value::PrimitiveValue;
@@ -13,9 +13,7 @@ fn generate_hash(original: &str) -> String {
     hex::encode(&result)[..16].to_uppercase()
 }
 
-pub fn process_file(input: &Path, output: Option<PathBuf>) -> Result<()> {
-    let mut obj = open_file(input)?; 
-
+pub fn anonymize_obj(obj: &mut InMemDicomObject) -> Result<()> {
     // 1. Get original ID to derive a hash
     let patient_id_tag = Tag(0x0010, 0x0020);
     let original_id = obj.element(patient_id_tag)
@@ -60,13 +58,19 @@ pub fn process_file(input: &Path, output: Option<PathBuf>) -> Result<()> {
 
     // 3. Apply generic replacements
     for (tag, vr, val) in replacements {
-        // Use PrimitiveValue::from for strings which works for LO, PN, DA, TM, DT (mostly)
-        // For VR::DA/TM/DT, they are effectively strings in DICOM standard (mostly).
         obj.put(DataElement::new(tag, vr, PrimitiveValue::from(val)));
     }
 
     // 4. Apply specific PatientID override
     obj.put(DataElement::new(patient_id_tag, VR::LO, PrimitiveValue::from(anon_id)));
+
+    Ok(())
+}
+
+pub fn process_file(input: &Path, output: Option<PathBuf>) -> Result<()> {
+    let mut obj = open_file(input)?; 
+
+    anonymize_obj(&mut obj)?;
 
     // 5. Save file
     let output_path = output.unwrap_or_else(|| {
@@ -80,4 +84,41 @@ pub fn process_file(input: &Path, output: Option<PathBuf>) -> Result<()> {
     println!("Anonymized file saved to: {:?}", output_path);
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use dicom::object::InMemDicomObject;
+    use dicom::core::DataElement;
+
+    #[test]
+    fn test_anonymization() {
+        let mut obj = InMemDicomObject::new_empty();
+
+        // Setup sensitive data
+        obj.put(DataElement::new(Tag(0x0010, 0x0010), VR::PN, PrimitiveValue::from("Doe^John")));
+        obj.put(DataElement::new(Tag(0x0010, 0x0020), VR::LO, PrimitiveValue::from("12345")));
+        obj.put(DataElement::new(Tag(0x0010, 0x0030), VR::DA, PrimitiveValue::from("19800101")));
+        obj.put(DataElement::new(Tag(0x0008, 0x0090), VR::PN, PrimitiveValue::from("Dr. House")));
+
+        anonymize_obj(&mut obj).unwrap();
+
+        // Verify Patient Name
+        let name = obj.element(Tag(0x0010, 0x0010)).unwrap().to_str().unwrap();
+        assert_eq!(name, "ANONYMOUS^PATIENT");
+
+        // Verify Patient ID (hashed)
+        let pid = obj.element(Tag(0x0010, 0x0020)).unwrap().to_str().unwrap();
+        assert!(pid.starts_with("ANON_"));
+        assert_ne!(pid, "12345");
+
+        // Verify Date (DA)
+        let dob = obj.element(Tag(0x0010, 0x0030)).unwrap().to_str().unwrap();
+        assert_eq!(dob, "19010101");
+
+        // Verify Other Physician Name (PN)
+        let doctor = obj.element(Tag(0x0008, 0x0090)).unwrap().to_str().unwrap();
+        assert_eq!(doctor, "ANONYMIZED");
+    }
 }
