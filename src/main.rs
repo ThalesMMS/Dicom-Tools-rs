@@ -2,6 +2,7 @@ mod anonymize;
 mod batch;
 mod image;
 mod metadata;
+mod scu;
 mod validate;
 mod web;
 
@@ -55,7 +56,16 @@ enum Commands {
         directory: PathBuf,
         #[arg(short, long)]
         operation: String, // choices: anonymize, convert, validate
-    }
+    },
+    /// Perform a DICOM C-ECHO (Ping)
+    Echo {
+        addr: String,
+    },
+    /// Perform a DICOM C-STORE (Push)
+    Push {
+        addr: String,
+        file: PathBuf,
+    },
 }
 
 #[tokio::main]
@@ -69,6 +79,8 @@ async fn main() -> anyhow::Result<()> {
         Commands::Validate { file } => validate::check_file(&file)?,
         Commands::Web { host, port } => web::start_server(&host, port).await?,
         Commands::Batch { directory, operation } => batch::process_directory(&directory, &operation)?,
+        Commands::Echo { addr } => scu::echo(&addr)?,
+        Commands::Push { addr, file } => scu::push(&addr, &file)?,
     }
 
     Ok(())
