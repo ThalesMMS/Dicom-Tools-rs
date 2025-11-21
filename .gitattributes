@@ -1,0 +1,11 @@
+# Normalize line endings
+* text=auto eol=lf
+
+# Treat common binary assets explicitly
+*.dcm binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+
+# Ensure Rust sources are detected correctly
+*.rs linguist-language=Rust

@@ -1,0 +1,12 @@
+# Build and tool artifacts
+/target/
+**/*.rs.bk
+
+# Editor and OS cruft
+.DS_Store
+.idea/
+.vscode/
+
+# Local env overrides
+/.env
+AGENTS.md
