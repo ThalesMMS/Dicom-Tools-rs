@@ -1,10 +1,10 @@
-use dicom::object::{open_file, InMemDicomObject};
-use dicom::core::{DataElement, Tag, VR};
+use anyhow::Result;
 use dicom::core::header::Header;
 use dicom::core::value::PrimitiveValue;
-use sha2::{Sha256, Digest};
+use dicom::core::{DataElement, Tag, VR};
+use dicom::object::{open_file, InMemDicomObject};
+use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
-use anyhow::Result;
 
 fn generate_hash(original: &str) -> String {
     let mut hasher = Sha256::new();
@@ -16,11 +16,12 @@ fn generate_hash(original: &str) -> String {
 pub fn anonymize_obj(obj: &mut InMemDicomObject) -> Result<()> {
     // 1. Get original ID to derive a hash
     let patient_id_tag = Tag(0x0010, 0x0020);
-    let original_id = obj.element(patient_id_tag)
+    let original_id = obj
+        .element(patient_id_tag)
         .ok()
         .and_then(|e| e.to_str().ok())
         .unwrap_or("UNKNOWN".into());
-    
+
     let anon_id = format!("ANON_{}", generate_hash(&original_id));
 
     // 2. Collect tags that need replacement based on VR
@@ -62,13 +63,17 @@ pub fn anonymize_obj(obj: &mut InMemDicomObject) -> Result<()> {
     }
 
     // 4. Apply specific PatientID override
-    obj.put(DataElement::new(patient_id_tag, VR::LO, PrimitiveValue::from(anon_id)));
+    obj.put(DataElement::new(
+        patient_id_tag,
+        VR::LO,
+        PrimitiveValue::from(anon_id),
+    ));
 
     Ok(())
 }
 
 pub fn process_file(input: &Path, output: Option<PathBuf>) -> Result<()> {
-    let mut obj = open_file(input)?; 
+    let mut obj = open_file(input)?;
 
     anonymize_obj(&mut obj)?;
 
@@ -89,18 +94,34 @@ pub fn process_file(input: &Path, output: Option<PathBuf>) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dicom::object::InMemDicomObject;
     use dicom::core::DataElement;
+    use dicom::object::InMemDicomObject;
 
     #[test]
     fn test_anonymization() {
         let mut obj = InMemDicomObject::new_empty();
 
         // Setup sensitive data
-        obj.put(DataElement::new(Tag(0x0010, 0x0010), VR::PN, PrimitiveValue::from("Doe^John")));
-        obj.put(DataElement::new(Tag(0x0010, 0x0020), VR::LO, PrimitiveValue::from("12345")));
-        obj.put(DataElement::new(Tag(0x0010, 0x0030), VR::DA, PrimitiveValue::from("19800101")));
-        obj.put(DataElement::new(Tag(0x0008, 0x0090), VR::PN, PrimitiveValue::from("Dr. House")));
+        obj.put(DataElement::new(
+            Tag(0x0010, 0x0010),
+            VR::PN,
+            PrimitiveValue::from("Doe^John"),
+        ));
+        obj.put(DataElement::new(
+            Tag(0x0010, 0x0020),
+            VR::LO,
+            PrimitiveValue::from("12345"),
+        ));
+        obj.put(DataElement::new(
+            Tag(0x0010, 0x0030),
+            VR::DA,
+            PrimitiveValue::from("19800101"),
+        ));
+        obj.put(DataElement::new(
+            Tag(0x0008, 0x0090),
+            VR::PN,
+            PrimitiveValue::from("Dr. House"),
+        ));
 
         anonymize_obj(&mut obj).unwrap();
 

@@ -3,332 +3,381 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DICOM Tools (Rust Version)</title>
+    <title>DICOM Tools (Rust)</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; background: #f5f5f5; padding: 20px; }
+        :root {
+            --bg: #0f1829;
+            --panel: #111d32;
+            --muted: #8aa0c2;
+            --text: #e7edf5;
+            --accent: #ff7043;
+            --accent-strong: #ff8b4d;
+            --border: rgba(255, 255, 255, 0.08);
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 24px;
+            background: radial-gradient(circle at 20% 20%, rgba(255,112,67,0.08), transparent 30%),
+                        radial-gradient(circle at 80% 0%, rgba(118,203,255,0.08), transparent 25%),
+                        var(--bg);
+            font-family: 'Space Grotesk', 'DM Sans', 'Avenir Next', system-ui, sans-serif;
+            color: var(--text);
+        }
+
         .container { max-width: 1200px; margin: 0 auto; }
-        header { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        h1 { color: #333; font-size: 2em; margin-bottom: 10px; }
-        h1::before { content: "🦀 "; /* Swapped to the Rust crab icon :) */ }
-        .subtitle { color: #666; font-size: 1.1em; }
-        .main-content { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }
-        .panel { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .upload-area { border: 3px dashed #ddd; border-radius: 10px; padding: 40px; text-align: center; cursor: pointer; transition: all 0.3s; }
-        .upload-area:hover { border-color: #e43b2e; background: #f9f9f9; } /* Rust accent color */
-        .upload-area.dragover { border-color: #e43b2e; background: #fff5f5; }
-        .btn { background: #e43b2e; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer; font-size: 1em; margin: 5px; transition: all 0.3s; }
-        .btn:hover { background: #c22b1e; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
-        .btn:disabled { background: #ccc; cursor: not-allowed; transform: none; }
-        .btn-secondary { background: #2196F3; }
-        .btn-secondary:hover { background: #0b7dda; }
-        .btn-danger { background: #f44336; }
-        .btn-danger:hover { background: #da190b; }
-        #imageView { max-width: 100%; border-radius: 5px; margin-top: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .metadata { margin-top: 15px; }
-        .metadata-section { margin-bottom: 15px; }
-        .metadata-section h3 { color: #e43b2e; margin-bottom: 10px; font-size: 1.2em; }
-        .metadata-item { display: flex; padding: 8px 0; border-bottom: 1px solid #eee; }
-        .metadata-item:last-child { border-bottom: none; }
-        .metadata-label { font-weight: bold; min-width: 150px; color: #666; }
-        .metadata-value { color: #333; word-break: break-all; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 15px; }
-        .stat-card { background: #f9f9f9; padding: 15px; border-radius: 5px; text-align: center; }
-        .stat-value { font-size: 1.5em; font-weight: bold; color: #e43b2e; }
-        .stat-label { color: #666; margin-top: 5px; font-size: 0.9em; }
-        .alert { padding: 15px; border-radius: 5px; margin: 15px 0; }
-        .alert-success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
-        .alert-error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
-        .alert-warning { background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
-        .loading { display: none; text-align: center; padding: 20px; }
+
+        header {
+            background: linear-gradient(135deg, rgba(255,112,67,0.12), rgba(255,255,255,0.02));
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 24px;
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.25);
+        }
+
+        h1 { margin: 0; font-size: 26px; letter-spacing: 0.02em; }
+        .subtitle { margin-top: 6px; color: var(--muted); font-size: 15px; }
+
+        .chips { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .chip {
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.03);
+            color: var(--muted);
+            font-size: 12px;
+            letter-spacing: 0.02em;
+        }
+
+        .grid {
+            margin-top: 18px;
+            display: grid;
+            grid-template-columns: 1fr 1.1fr;
+            gap: 16px;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 18px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+
+        .panel h2 { margin: 0 0 12px; font-size: 18px; }
+
+        .status-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .status-pill {
+            padding: 6px 12px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            color: var(--muted);
+            font-size: 13px;
+        }
+        .status-pill.active { color: var(--text); border-color: rgba(255,112,67,0.5); }
+
+        .upload-area {
+            border: 1.5px dashed var(--muted);
+            border-radius: 14px;
+            padding: 28px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            background: rgba(255,255,255,0.02);
+        }
+        .upload-area:hover, .upload-area.dragover { border-color: var(--accent); background: rgba(255,112,67,0.06); }
+
+        .actions { margin-top: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+        .btn {
+            padding: 12px 14px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+            color: #0c1424;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            letter-spacing: 0.01em;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(255,112,67,0.35); }
+        .btn.secondary { background: rgba(255,255,255,0.06); color: var(--text); border: 1px solid var(--border); }
+        .btn.danger { background: linear-gradient(135deg, #ff4b4b, #ff6b6b); color: #0c1424; }
+
+        .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 14px; }
+        .info-card { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+        .info-label { color: var(--muted); font-size: 12px; }
+        .info-value { font-size: 15px; margin-top: 4px; }
+
+        .viewer { min-height: 480px; display: flex; flex-direction: column; gap: 12px; }
+        .viewer #viewerContent { flex: 1; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 12px; padding: 16px; overflow: auto; }
+        .viewer img { max-width: 100%; border-radius: 10px; display: block; margin: 0 auto; }
+
+        .loading { display: none; text-align: center; padding: 12px; }
         .loading.active { display: block; }
-        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #e43b2e; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        footer { text-align: center; margin-top: 30px; padding: 20px; color: #666; }
+        .spinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.15); border-top-color: var(--accent); animation: spin 1s linear infinite; margin: 8px auto; }
+
+        .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+        .stat-card { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 10px; padding: 10px; }
+        .stat-label { color: var(--muted); font-size: 12px; }
+        .stat-value { font-size: 22px; font-weight: 700; }
+
+        .alert { padding: 12px; border-radius: 10px; margin-bottom: 10px; }
+        .alert.success { background: rgba(46, 204, 113, 0.12); border: 1px solid rgba(46, 204, 113, 0.35); }
+        .alert.error { background: rgba(255, 75, 75, 0.1); border: 1px solid rgba(255, 75, 75, 0.35); }
+        .alert.warning { background: rgba(255, 193, 7, 0.12); border: 1px solid rgba(255, 193, 7, 0.35); }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 860px) {
+            .grid { grid-template-columns: 1fr; }
+            header { flex-direction: column; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>DICOM Tools (Rust)</h1>
-            <p class="subtitle">Fast web interface for medical imaging workflows</p>
+            <div>
+                <h1>DICOM Tools • Rust</h1>
+                <p class="subtitle">Fast inspection, anonymization, and previews powered by dicom-rs</p>
+                <div class="chips">
+                    <span class="chip">CLI ready</span>
+                    <span class="chip">Axum web UI</span>
+                    <span class="chip">dicom-rs 0.7</span>
+                </div>
+            </div>
+            <div class="status-bar" id="statusBar">
+                <span class="status-pill">No file loaded</span>
+            </div>
         </header>
 
-        <div class="main-content">
-            <div class="panel">
-                <h2>📤 Upload DICOM</h2>
+        <div class="grid">
+            <section class="panel">
+                <h2>Upload & Actions</h2>
                 <div class="upload-area" id="uploadArea">
-                    <p style="font-size: 3em; margin-bottom: 10px;">📁</p>
-                    <p>Drag and drop a DICOM file here</p>
-                    <p style="color: #999; margin: 10px 0;">or</p>
+                    <div style="font-size: 42px; margin-bottom: 6px;">📁</div>
+                    <div>Drop a DICOM file here or click to browse</div>
                     <input type="file" id="fileInput" accept=".dcm,.dicom" style="display: none;">
-                    <button class="btn" onclick="document.getElementById('fileInput').click()">Choose File</button>
                 </div>
 
-        <div class="loading" id="loading">
-            <div class="spinner"></div>
-            <p style="margin-top: 15px;">Processing...</p>
-        </div>
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <div>Processing...</div>
+                </div>
 
-        <div id="fileInfo" style="margin-top: 20px; display: none;">
-            <h3>📋 File Information</h3>
-            <div class="metadata-item">
-                <span class="metadata-label">Patient:</span>
-                <span class="metadata-value" id="infoPatient"></span>
-            </div>
-            <div class="metadata-item">
-                <span class="metadata-label">Modality:</span>
-                <span class="metadata-value" id="infoModality"></span>
-            </div>
-            <div class="metadata-item">
-                <span class="metadata-label">Study Date:</span>
-                <span class="metadata-value" id="infoStudyDate"></span>
-            </div>
+                <div class="info-grid" id="fileInfo" style="display: none;">
+                    <div class="info-card"><div class="info-label">Patient</div><div class="info-value" id="infoPatient">—</div></div>
+                    <div class="info-card"><div class="info-label">Modality</div><div class="info-value" id="infoModality">—</div></div>
+                    <div class="info-card"><div class="info-label">Study Date</div><div class="info-value" id="infoStudyDate">—</div></div>
+                    <div class="info-card"><div class="info-label">Pixel Data</div><div class="info-value" id="infoPixel">—</div></div>
+                </div>
 
-            <div style="margin-top: 20px;">
-                <button class="btn" onclick="showMetadata()">📊 View Metadata</button>
-                <button class="btn btn-secondary" onclick="showStats()">📈 Pixel Stats</button>
-                <button class="btn btn-secondary" onclick="anonymize()">🔒 Anonymize</button>
-                <button class="btn btn-danger" onclick="validate()">✓ Validate</button>
-            </div>
-        </div>
-    </div>
+                <div class="actions">
+                    <button class="btn secondary" onclick="showMetadata()">View Metadata</button>
+                    <button class="btn secondary" onclick="showStats()">Pixel Stats</button>
+                    <button class="btn" onclick="validateFile()">Validate</button>
+                    <button class="btn danger" onclick="anonymize()">Anonymize & Download</button>
+                </div>
+            </section>
 
-    <div class="panel">
-        <h2>🖼️ Viewer</h2>
-        <div id="viewerContent">
-            <p style="text-align: center; color: #999; padding: 60px 20px;">
-                Upload a file to view it
-            </p>
+            <section class="panel viewer">
+                <h2>Viewer & Details</h2>
+                <div id="viewerContent">
+                    <p style="color: var(--muted); text-align: center; padding: 32px;">Upload a DICOM file to preview the first frame, inspect metadata, or anonymize safely.</p>
+                </div>
+            </section>
         </div>
     </div>
-        </div>
-    </div>
-
-    <footer>
-        <p>DICOM Tools v1.0.0 (Rust Version) | Axum & dicom-rs</p>
-    </footer>
 
     <script>
-        let currentFilename = null;
-
-    // Drag & drop setup
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
+        const viewerContent = document.getElementById('viewerContent');
+        const loadingEl = document.getElementById('loading');
+        const statusBar = document.getElementById('statusBar');
 
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
-        });
+        const state = { currentFilename: null, info: null };
 
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
-        });
-
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadArea.classList.remove('dragover');
             const file = e.dataTransfer.files[0];
             if (file) uploadFile(file);
         });
+        fileInput.addEventListener('change', (e) => { const file = e.target.files[0]; if (file) uploadFile(file); });
 
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) uploadFile(file);
-        });
+        function setLoading(active) {
+            loadingEl.classList.toggle('active', active);
+        }
+
+        function updateStatus(text, tone = 'muted') {
+            statusBar.innerHTML = '';
+            const pill = document.createElement('span');
+            pill.className = 'status-pill active';
+            pill.textContent = text;
+            if (tone === 'warning') pill.style.borderColor = 'rgba(255,193,7,0.4)';
+            if (tone === 'error') pill.style.borderColor = 'rgba(255,75,75,0.45)';
+            statusBar.appendChild(pill);
+        }
+
+        function renderFileInfo(info) {
+            document.getElementById('fileInfo').style.display = 'grid';
+            document.getElementById('infoPatient').textContent = info.patient_name || 'N/A';
+            document.getElementById('infoModality').textContent = info.modality || 'N/A';
+            document.getElementById('infoStudyDate').textContent = info.study_date || 'N/A';
+            document.getElementById('infoPixel').textContent = info.has_pixel_data ? 'Present' : 'None';
+        }
 
         async function uploadFile(file) {
             const formData = new FormData();
             formData.append('file', file);
-
-        document.getElementById('loading').classList.add('active');
-        document.getElementById('fileInfo').style.display = 'none';
-        document.getElementById('viewerContent').innerHTML = '<p style="text-align: center; color: #999; padding: 60px 20px;">Loading...</p>';
+            setLoading(true);
+            updateStatus('Uploading…');
 
             try {
-                const response = await fetch('/api/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-
+                const response = await fetch('/api/upload', { method: 'POST', body: formData });
                 const data = await response.json();
+                if (!data.success) throw new Error(data.error || 'Upload failed');
 
-                if (data.success) {
-                    currentFilename = data.filename;
-                    
-            // Fill basic information
-            // The Rust backend should return this 'info' structure in the JSON
-            if (data.info) {
-                document.getElementById('infoPatient').textContent = data.info.patient_name || 'N/A';
-                document.getElementById('infoModality').textContent = data.info.modality || 'N/A';
-                document.getElementById('infoStudyDate').textContent = data.info.study_date || 'N/A';
-                document.getElementById('fileInfo').style.display = 'block';
-
-                if (data.info.has_pixel_data) {
-                    // Timestamp prevents browser caching of the rendered image
-                    document.getElementById('viewerContent').innerHTML = 
-                        `<img id="imageView" src="/api/image/${data.filename}?t=${new Date().getTime()}" alt="DICOM Image">`;
-                } else {
-                    document.getElementById('viewerContent').innerHTML = 
-                        '<p style="text-align: center; color: #999; padding: 60px 20px;">No pixel data found in this file</p>';
-                }
-            } else {
-                // Fallback if the Rust backend is not returning complete info yet
-                document.getElementById('fileInfo').style.display = 'block';
-                document.getElementById('infoPatient').textContent = "Loaded";
-                document.getElementById('viewerContent').innerHTML = "<p style='text-align:center'>File uploaded successfully.</p>";
+                state.currentFilename = data.filename;
+                state.info = data.info || {};
+                renderFileInfo(state.info);
+                updateStatus(`Loaded ${state.currentFilename}`);
+                showPreview();
+            } catch (error) {
+                alert('Upload failed: ' + error.message);
+                updateStatus('Upload failed', 'error');
             }
 
-        } else {
-            alert('Error: ' + (data.error || 'Upload failed'));
+            setLoading(false);
         }
-    } catch (error) {
-        alert('Upload failed: ' + error.message);
-        console.error(error);
-            }
 
-            document.getElementById('loading').classList.remove('active');
+        function showPreview() {
+            if (!state.currentFilename) return;
+            if (state.info && state.info.has_pixel_data) {
+                const timestamp = new Date().getTime();
+                viewerContent.innerHTML = `<img src="/api/image/${state.currentFilename}?t=${timestamp}" alt="DICOM frame">`;
+            } else {
+                viewerContent.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 32px;">No pixel data present in this file.</p>';
+            }
         }
 
         async function showMetadata() {
-            if (!currentFilename) return;
+            if (!state.currentFilename) return alert('Load a file first.');
+            viewerContent.innerHTML = '<p style="text-align:center;color:var(--muted);">Loading metadata…</p>';
 
             try {
-                const response = await fetch(`/api/metadata/${currentFilename}`);
+                const response = await fetch(`/api/metadata/${state.currentFilename}`);
                 const data = await response.json();
-
-        let html = '<h3>📋 Full Metadata</h3><div class="metadata">';
-
-        // Iterate over categories (Patient, Study, etc.)
-        for (const [category, fields] of Object.entries(data)) {
-            // Capitalize the category name
-            const catTitle = category.charAt(0).toUpperCase() + category.slice(1);
-            
-            html += `<div class="metadata-section"><h3>${catTitle}</h3>`;
-            
-            // Ensure fields is an object before iterating
-            if (typeof fields === 'object' && fields !== null) {
-                for (const [key, value] of Object.entries(fields)) {
-                    html += `<div class="metadata-item">
-                        <span class="metadata-label">${key}:</span>
-                                <span class="metadata-value">${value}</span>
-                            </div>`;
-                        }
+                let html = '<h3>Metadata</h3>';
+                const renderSection = (name, obj) => {
+                    html += `<div style="margin-top:10px;">`;
+                    html += `<div style="font-weight:600;margin-bottom:6px;">${name}</div>`;
+                    for (const [key, value] of Object.entries(obj)) {
+                        html += `<div class="info-card"><div class="info-label">${key}</div><div class="info-value">${value}</div></div>`;
                     }
                     html += '</div>';
-                }
-
+                };
+                html += '<div class="info-grid">';
+                renderSection('Patient', data.patient || {});
+                renderSection('Study', data.study || {});
+                renderSection('Image', data.image || {});
+                renderSection('Technical', data.misc || {});
                 html += '</div>';
-                document.getElementById('viewerContent').innerHTML = html;
-    } catch (error) {
-        alert('Failed to load metadata: ' + error.message);
-    }
+                viewerContent.innerHTML = html;
+            } catch (error) {
+                viewerContent.innerHTML = '<div class="alert error">Failed to load metadata.</div>';
+            }
         }
 
         async function showStats() {
-            if (!currentFilename) return;
-
-    document.getElementById('viewerContent').innerHTML = '<p style="text-align: center; padding: 60px 20px;">Calculating statistics...</p>';
+            if (!state.currentFilename) return alert('Load a file first.');
+            viewerContent.innerHTML = '<p style="text-align:center;color:var(--muted);">Calculating pixel statistics…</p>';
 
             try {
-                const response = await fetch(`/api/stats/${currentFilename}`);
+                const response = await fetch(`/api/stats/${state.currentFilename}`);
                 const data = await response.json();
+                const stats = [
+                    { label: 'Minimum', value: data.min?.toFixed(2) },
+                    { label: 'Maximum', value: data.max?.toFixed(2) },
+                    { label: 'Mean', value: data.mean?.toFixed(2) },
+                    { label: 'Median', value: data.median ? data.median.toFixed(2) : 'N/A' },
+                    { label: 'Std Dev', value: data.std_dev ? data.std_dev.toFixed(2) : 'N/A' },
+                    { label: 'Total Pixels', value: data.total_pixels?.toLocaleString() },
+                ];
 
-        let html = '<h3>📊 Pixel Statistics</h3>';
-        html += '<div class="stats-grid">';
-
-        const stats = [
-            { label: 'Minimum', value: data.min },
-            { label: 'Maximum', value: data.max },
-            { label: 'Mean', value: data.mean ? data.mean.toFixed(2) : 'N/A' },
-            { label: 'Median', value: data.median ? data.median.toFixed(2) : 'N/A' },
-            { label: 'Std Dev', value: data.std ? data.std.toFixed(2) : 'N/A' },
-            { label: 'Total Pixels', value: data.total_pixels ? data.total_pixels.toLocaleString() : 'N/A' },
-        ];
-
+                let html = '<h3>Pixel Statistics</h3><div class="stat-grid">';
                 stats.forEach(stat => {
-                    html += `<div class="stat-card">
-                        <div class="stat-value">${stat.value}</div>
-                        <div class="stat-label">${stat.label}</div>
-                    </div>`;
+                    html += `<div class="stat-card"><div class="stat-label">${stat.label}</div><div class="stat-value">${stat.value || '—'}</div></div>`;
                 });
-
                 html += '</div>';
-                document.getElementById('viewerContent').innerHTML = html;
-    } catch (error) {
-        alert('Failed to load statistics: ' + error.message);
-        document.getElementById('viewerContent').innerHTML = '<p style="text-align: center; color: red;">Error calculating statistics</p>';
-    }
+                viewerContent.innerHTML = html;
+            } catch (error) {
+                viewerContent.innerHTML = '<div class="alert error">Failed to compute statistics.</div>';
+            }
         }
 
         async function anonymize() {
-            if (!currentFilename) return;
-
-    if (!confirm('Anonymize this DICOM file? Patient information will be removed.')) return;
-
-            document.getElementById('loading').classList.add('active');
-
-            try {
-                const response = await fetch(`/api/anonymize/${currentFilename}`, { method: 'POST' });
-                const data = await response.json();
-
-        if (data.success) {
-            alert('File anonymized successfully! Starting download...');
-            // Redirect to download
-            window.location.href = `/api/download/${data.filename}`;
-        } else {
-            alert('Error: ' + (data.error || 'Anonymization failed'));
-        }
-    } catch (error) {
-        alert('Anonymization failed: ' + error.message);
-    }
-
-            document.getElementById('loading').classList.remove('active');
-        }
-
-        async function validate() {
-            if (!currentFilename) return;
-
-    document.getElementById('viewerContent').innerHTML = '<p style="text-align: center; padding: 60px 20px;">Validating...</p>';
+            if (!state.currentFilename) return alert('Load a file first.');
+            if (!confirm('Anonymize this DICOM file? Patient attributes will be replaced.')) return;
+            setLoading(true);
+            updateStatus('Anonymizing…');
 
             try {
-                const response = await fetch(`/api/validate/${currentFilename}`);
+                const response = await fetch(`/api/anonymize/${state.currentFilename}`, { method: 'POST' });
                 const data = await response.json();
+                if (!data.success) throw new Error(data.error || 'Anonymization failed');
+                state.currentFilename = data.filename;
+                updateStatus('Anonymized copy ready');
+                window.location.href = `/api/download/${data.filename}`;
+            } catch (error) {
+                alert('Anonymization failed: ' + error.message);
+                updateStatus('Anonymization failed', 'error');
+            }
 
-        let html = '<h3>✓ Validation Results</h3>';
-
-        if (data.valid) {
-            html += '<div class="alert alert-success">✓ File is valid!</div>';
-        } else {
-            html += '<div class="alert alert-error">✗ Validation failed</div>';
+            setLoading(false);
         }
 
-        if (data.errors && data.errors.length > 0) {
-            html += '<div class="metadata-section"><h3>Errors</h3>';
-            data.errors.forEach(err => {
-                html += `<div class="alert alert-error">${err}</div>`;
-            });
-            html += '</div>';
-        }
+        async function validateFile() {
+            if (!state.currentFilename) return alert('Load a file first.');
+            viewerContent.innerHTML = '<p style="text-align:center;color:var(--muted);">Validating…</p>';
 
-        if (data.warnings && data.warnings.length > 0) {
-            html += '<div class="metadata-section"><h3>Warnings</h3>';
-            data.warnings.forEach(warn => {
-                html += `<div class="alert alert-warning">${warn}</div>`;
-            });
-            html += '</div>';
-        }
-        
-        // If there are no errors or warnings
-        if ((!data.errors || data.errors.length === 0) && (!data.warnings || data.warnings.length === 0) && data.valid) {
-             html += '<p>No errors or warnings found.</p>';
-        }
+            try {
+                const response = await fetch(`/api/validate/${state.currentFilename}`);
+                const data = await response.json();
+                let html = '';
+                if (data.valid) {
+                    html += '<div class="alert success">✓ File is valid</div>';
+                } else {
+                    html += '<div class="alert error">Validation failed</div>';
+                }
 
-        document.getElementById('viewerContent').innerHTML = html;
-    } catch (error) {
-        alert('Validation failed: ' + error.message);
-    }
-}
+                if (data.errors && data.errors.length) {
+                    data.errors.forEach(err => { html += `<div class="alert error">${err}</div>`; });
+                }
+                if (data.warnings && data.warnings.length) {
+                    data.warnings.forEach(w => { html += `<div class="alert warning">${w}</div>`; });
+                }
+
+                if ((!data.errors || !data.errors.length) && (!data.warnings || !data.warnings.length)) {
+                    html += '<div class="alert">No warnings or errors reported.</div>';
+                }
+
+                viewerContent.innerHTML = html;
+                updateStatus(data.valid ? 'Valid DICOM' : 'Needs attention', data.valid ? 'muted' : 'warning');
+            } catch (error) {
+                viewerContent.innerHTML = '<div class="alert error">Validation failed.</div>';
+                updateStatus('Validation failed', 'error');
+            }
+        }
     </script>
 </body>
 </html>

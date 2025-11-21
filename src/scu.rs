@@ -1,15 +1,15 @@
-use std::path::Path;
 use anyhow::{Context, Result};
-use dicom_ul::association::client::ClientAssociationOptions;
-use dicom_ul::pdu::{Pdu, PDataValue, PDataValueType, PresentationContextResultReason};
-use dicom::core::{DataElement, Tag, VR, PrimitiveValue};
+use dicom::core::{DataElement, PrimitiveValue, Tag, VR};
 use dicom::object::{open_file, InMemDicomObject};
+use dicom_ul::association::client::ClientAssociationOptions;
+use dicom_ul::pdu::{PDataValue, PDataValueType, Pdu, PresentationContextResultReason};
+use std::path::Path;
 
 // Import Registry
 use dicom::transfer_syntax::TransferSyntaxRegistry;
-// Import Index trait to enable .get(). 
+// Import Index trait to enable .get().
 // Using generic encoding path which usually works for dicom 0.7
-use dicom::encoding::TransferSyntaxIndex; 
+use dicom::encoding::TransferSyntaxIndex;
 
 pub fn echo(addr: &str) -> Result<()> {
     println!("Sending C-ECHO to {}", addr);
@@ -30,17 +30,35 @@ pub fn echo(addr: &str) -> Result<()> {
 
     // Construct C-ECHO-RQ
     let mut cmd = InMemDicomObject::new_empty();
-    cmd.put(DataElement::new(Tag(0x0000, 0x0002), VR::UI, PrimitiveValue::from(abstract_syntax))); 
-    cmd.put(DataElement::new(Tag(0x0000, 0x0100), VR::US, PrimitiveValue::from(0x0030_u16))); 
-    cmd.put(DataElement::new(Tag(0x0000, 0x0110), VR::US, PrimitiveValue::from(1_u16)));      
-    cmd.put(DataElement::new(Tag(0x0000, 0x0800), VR::US, PrimitiveValue::from(0x0101_u16))); 
+    cmd.put(DataElement::new(
+        Tag(0x0000, 0x0002),
+        VR::UI,
+        PrimitiveValue::from(abstract_syntax),
+    ));
+    cmd.put(DataElement::new(
+        Tag(0x0000, 0x0100),
+        VR::US,
+        PrimitiveValue::from(0x0030_u16),
+    ));
+    cmd.put(DataElement::new(
+        Tag(0x0000, 0x0110),
+        VR::US,
+        PrimitiveValue::from(1_u16),
+    ));
+    cmd.put(DataElement::new(
+        Tag(0x0000, 0x0800),
+        VR::US,
+        PrimitiveValue::from(0x0101_u16),
+    ));
 
     // Get IVRLE Transfer Syntax
-    let ts = TransferSyntaxRegistry.get("1.2.840.10008.1.2")
+    let ts = TransferSyntaxRegistry
+        .get("1.2.840.10008.1.2")
         .context("Implicit VR Little Endian transfer syntax not found")?;
 
     let mut command_bytes = Vec::new();
-    cmd.write_dataset_with_ts(&mut command_bytes, ts).context("Failed to encode command set")?;
+    cmd.write_dataset_with_ts(&mut command_bytes, ts)
+        .context("Failed to encode command set")?;
 
     let pdu = Pdu::PData {
         data: vec![PDataValue {
@@ -52,8 +70,10 @@ pub fn echo(addr: &str) -> Result<()> {
     };
 
     association.send(&pdu).context("Failed to send C-ECHO-RQ")?;
-    
-    let msg = association.receive().context("Failed to receive C-ECHO-RSP")?;
+
+    let msg = association
+        .receive()
+        .context("Failed to receive C-ECHO-RSP")?;
     println!("Received response: {:?}", msg);
 
     let _ = association.release();
@@ -64,9 +84,15 @@ pub fn push(addr: &str, file: &Path) -> Result<()> {
     println!("Sending C-STORE for {:?} to {}", file, addr);
 
     let obj = open_file(file).context("Failed to open DICOM file")?;
-    
-    let sop_class = obj.element(Tag(0x0008, 0x0016)).context("Missing SOP Class UID")?.to_str()?;
-    let sop_instance = obj.element(Tag(0x0008, 0x0018)).context("Missing SOP Instance UID")?.to_str()?;
+
+    let sop_class = obj
+        .element(Tag(0x0008, 0x0016))
+        .context("Missing SOP Class UID")?
+        .to_str()?;
+    let sop_instance = obj
+        .element(Tag(0x0008, 0x0018))
+        .context("Missing SOP Instance UID")?
+        .to_str()?;
 
     let mut association = ClientAssociationOptions::new()
         .with_abstract_syntax(&*sop_class)
@@ -82,27 +108,58 @@ pub fn push(addr: &str, file: &Path) -> Result<()> {
 
     // Construct C-STORE-RQ
     let mut cmd = InMemDicomObject::new_empty();
-    cmd.put(DataElement::new(Tag(0x0000, 0x0002), VR::UI, PrimitiveValue::from(sop_class.to_string())));
-    cmd.put(DataElement::new(Tag(0x0000, 0x0100), VR::US, PrimitiveValue::from(0x0001_u16))); 
-    cmd.put(DataElement::new(Tag(0x0000, 0x0110), VR::US, PrimitiveValue::from(2_u16)));      
-    cmd.put(DataElement::new(Tag(0x0000, 0x0800), VR::US, PrimitiveValue::from(0x0000_u16))); 
-    cmd.put(DataElement::new(Tag(0x0000, 1000), VR::UI, PrimitiveValue::from(sop_instance.to_string()))); 
+    cmd.put(DataElement::new(
+        Tag(0x0000, 0x0002),
+        VR::UI,
+        PrimitiveValue::from(sop_class.to_string()),
+    ));
+    cmd.put(DataElement::new(
+        Tag(0x0000, 0x0100),
+        VR::US,
+        PrimitiveValue::from(0x0001_u16),
+    ));
+    cmd.put(DataElement::new(
+        Tag(0x0000, 0x0110),
+        VR::US,
+        PrimitiveValue::from(2_u16),
+    ));
+    cmd.put(DataElement::new(
+        Tag(0x0000, 0x0800),
+        VR::US,
+        PrimitiveValue::from(0x0000_u16),
+    ));
+    cmd.put(DataElement::new(
+        Tag(0x0000, 1000),
+        VR::UI,
+        PrimitiveValue::from(sop_instance.to_string()),
+    ));
 
     // Get IVRLE Transfer Syntax for Command Set
-    let ts_ivrle = TransferSyntaxRegistry.get("1.2.840.10008.1.2")
+    let ts_ivrle = TransferSyntaxRegistry
+        .get("1.2.840.10008.1.2")
         .context("Implicit VR Little Endian transfer syntax not found")?;
 
     let mut command_bytes = Vec::new();
-    cmd.write_dataset_with_ts(&mut command_bytes, ts_ivrle).context("Failed to encode command set")?;
+    cmd.write_dataset_with_ts(&mut command_bytes, ts_ivrle)
+        .context("Failed to encode command set")?;
 
     // Encode File Dataset
-    let pc = association.presentation_contexts().iter().find(|pc| pc.id == pc_id).unwrap();
+    let pc = association
+        .presentation_contexts()
+        .iter()
+        .find(|pc| pc.id == pc_id)
+        .unwrap();
     let negotiated_ts_uid = &pc.transfer_syntax;
-    let ts_negotiated = TransferSyntaxRegistry.get(negotiated_ts_uid)
-        .context(format!("Negotiated transfer syntax {} not found", negotiated_ts_uid))?;
+    let ts_negotiated = TransferSyntaxRegistry
+        .get(negotiated_ts_uid)
+        .context(format!(
+            "Negotiated transfer syntax {} not found",
+            negotiated_ts_uid
+        ))?;
 
     let mut data_bytes = Vec::new();
-    obj.write_dataset_with_ts(&mut data_bytes, ts_negotiated).context("Failed to encode data set")?;
+    obj.write_dataset_with_ts(&mut data_bytes, ts_negotiated)
+        .context("Failed to encode data set")?;
 
     // Send Command
     association.send(&Pdu::PData {
@@ -124,7 +181,9 @@ pub fn push(addr: &str, file: &Path) -> Result<()> {
         }],
     })?;
 
-    let msg = association.receive().context("Failed to receive C-STORE-RSP")?;
+    let msg = association
+        .receive()
+        .context("Failed to receive C-STORE-RSP")?;
     println!("Received response: {:?}", msg);
 
     let _ = association.release();

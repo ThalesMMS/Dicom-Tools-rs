@@ -1,11 +1,13 @@
+use anyhow::Result;
 use dicom::object::open_file;
 use dicom::pixeldata::PixelDecoder;
+use image::{DynamicImage, ImageFormat};
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
-use anyhow::Result;
 
 pub fn convert(input: &Path, output: Option<PathBuf>, format: &str) -> Result<()> {
     let obj = open_file(input)?;
-    
+
     // Decode pixel data (handles compression when features are enabled)
     let decoded_image = obj.decode_pixel_data()?;
     let num_frames = decoded_image.number_of_frames();
@@ -30,11 +32,24 @@ pub fn convert(input: &Path, output: Option<PathBuf>, format: &str) -> Result<()
             let dynamic_image = decoded_image.to_dynamic_image(i)?;
             let frame_name = format!("{}_frame{:03}.{}", stem, i, format);
             let frame_path = parent.join(frame_name);
-            
+
             dynamic_image.save(&frame_path)?;
             println!("Saved frame {} to {:?}", i, frame_path);
         }
     }
 
     Ok(())
+}
+
+pub fn first_frame_png_bytes(input: &Path) -> Result<Vec<u8>> {
+    let obj = open_file(input)?;
+    let decoded_image = obj.decode_pixel_data()?;
+    let dynamic_image = decoded_image.to_dynamic_image(0)?;
+    encode_image(&dynamic_image, ImageFormat::Png)
+}
+
+fn encode_image(image: &DynamicImage, format: ImageFormat) -> Result<Vec<u8>> {
+    let mut buffer = Vec::new();
+    image.write_to(&mut Cursor::new(&mut buffer), format)?;
+    Ok(buffer)
 }

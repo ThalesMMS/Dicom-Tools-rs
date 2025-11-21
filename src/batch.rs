@@ -1,13 +1,16 @@
-use walkdir::WalkDir;
+use anyhow::Result;
 use rayon::prelude::*;
 use std::path::Path;
-use anyhow::Result;
-use crate::{anonymize, validate};
+use walkdir::WalkDir;
 
-pub fn process_directory(dir: &Path, operation: &str) -> Result<()> {
-    println!("Processando diretório: {:?} | Operação: {}", dir, operation);
+use crate::{anonymize, cli::BatchOperation, validate};
 
-    // Collect all .dcm files
+pub fn process_directory(dir: &Path, operation: BatchOperation) -> Result<()> {
+    println!(
+        "Processando diretório: {:?} | Operação: {:?}",
+        dir, operation
+    );
+
     let files: Vec<_> = WalkDir::new(dir)
         .into_iter()
         .filter_map(|e| e.ok())
@@ -16,13 +19,11 @@ pub fn process_directory(dir: &Path, operation: &str) -> Result<()> {
 
     println!("Encontrados {} arquivos.", files.len());
 
-    // Parallel processing
     files.par_iter().for_each(|entry| {
         let path = entry.path();
         let res = match operation {
-            "anonymize" => anonymize::process_file(path, None),
-            "validate" => validate::check_file(path),
-            _ => Ok(()),
+            BatchOperation::Anonymize => anonymize::process_file(path, None),
+            BatchOperation::Validate => validate::check_file(path),
         };
 
         if let Err(e) = res {
