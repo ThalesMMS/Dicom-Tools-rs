@@ -9,3 +9,6 @@
 
 # Ensure Rust sources are detected correctly
 *.rs linguist-language=Rust
+
+# Exclude demo HTML from language stats
+src/templates/index.html linguist-detectable=false
