@@ -1,8 +1,10 @@
 use std::path::PathBuf;
 
+use anyhow::{anyhow, bail};
 use clap::{Parser, Subcommand, ValueEnum};
+use dicom_pixeldata::WindowLevel;
 
-use crate::{anonymize, batch, image, json, metadata, scu, stats, transcode, validate, web};
+use crate::{anonymize, batch, dump, image, json, metadata, scu, stats, transcode, validate, web};
 
 #[derive(Parser)]
 #[command(name = "dicom-tools")]
@@ -33,6 +35,22 @@ pub enum Commands {
         output: Option<PathBuf>,
         #[arg(long, default_value = "png")]
         format: String,
+        #[arg(long)]
+        frame: Option<u32>,
+        #[arg(long)]
+        window_center: Option<f64>,
+        #[arg(long)]
+        window_width: Option<f64>,
+        #[arg(long)]
+        normalize: bool,
+        #[arg(long)]
+        disable_modality_lut: bool,
+        #[arg(long)]
+        disable_voi_lut: bool,
+        #[arg(long, conflicts_with = "force_16bit")]
+        force_8bit: bool,
+        #[arg(long)]
+        force_16bit: bool,
     },
     /// Validate file integrity
     Validate { file: PathBuf },
@@ -81,6 +99,20 @@ pub enum Commands {
     },
     /// Calculate Pixel Statistics
     Stats { file: PathBuf },
+    /// Generate an intensity histogram
+    Histogram {
+        file: PathBuf,
+        #[arg(long, default_value_t = 256)]
+        bins: usize,
+    },
+    /// Dump the whole DICOM dataset
+    Dump {
+        file: PathBuf,
+        #[arg(long, default_value_t = 4)]
+        max_depth: usize,
+        #[arg(long, default_value_t = 64)]
+        max_value_len: usize,
+    },
 }
 
 #[derive(Copy, Clone, Debug, ValueEnum)]
@@ -118,7 +150,27 @@ pub async fn run() -> anyhow::Result<()> {
             input,
             output,
             format,
-        } => image::convert(&input, output, &format)?,
+            frame,
+            window_center,
+            window_width,
+            normalize,
+            disable_modality_lut,
+            disable_voi_lut,
+            force_8bit,
+            force_16bit,
+        } => {
+            let window = parse_window(window_center, window_width)?;
+            let options = image::ImageExportOptions {
+                frame,
+                window,
+                normalize,
+                disable_modality_lut,
+                disable_voi_lut,
+                force_8bit,
+                force_16bit,
+            };
+            image::convert(&input, output, &format, &options)?
+        }
         Commands::Validate { file } => validate::check_file(&file)?,
         Commands::Web { host, port } => web::start_server(&host, port).await?,
         Commands::Batch {
@@ -135,7 +187,56 @@ pub async fn run() -> anyhow::Result<()> {
             transfer_syntax,
         } => transcode::transcode(&input, &output, transfer_syntax.into())?,
         Commands::Stats { file } => stats::stats(&file)?,
+        Commands::Histogram { file, bins } => {
+            if bins == 0 {
+                bail!("Number of bins must be greater than zero");
+            }
+            let histogram = stats::histogram_for_file(&file, bins)?;
+            let total: u64 = histogram.bins.iter().sum();
+            println!(
+                "Histogram for {:?} | bins: {} | total pixels: {}",
+                file,
+                histogram.bins.len(),
+                total
+            );
+            println!("  Min: {:.2}", histogram.min);
+            println!("  Max: {:.2}", histogram.max);
+            let range = if histogram.bins.len() > 1 {
+                (histogram.max - histogram.min) / histogram.bins.len() as f32
+            } else {
+                0.0
+            };
+            let preview = histogram.bins.iter().take(16);
+            for (idx, count) in preview.enumerate() {
+                let start = histogram.min + (idx as f32) * range;
+                let end = start + range;
+                println!("  Bin {:03}: [{:.2}, {:.2}] -> {}", idx, start, end, count);
+            }
+            if histogram.bins.len() > 16 {
+                println!("  ... {} more bins omitted", histogram.bins.len() - 16);
+            }
+        }
+        Commands::Dump {
+            file,
+            max_depth,
+            max_value_len,
+        } => {
+            dump::dump_file(&file, max_depth, max_value_len)?;
+        }
     }
 
     Ok(())
+}
+
+fn parse_window(center: Option<f64>, width: Option<f64>) -> anyhow::Result<Option<WindowLevel>> {
+    match (center, width) {
+        (Some(c), Some(w)) => Ok(Some(WindowLevel {
+            center: c,
+            width: w,
+        })),
+        (None, None) => Ok(None),
+        _ => Err(anyhow!(
+            "Provide both --window-center and --window-width, or neither"
+        )),
+    }
 }

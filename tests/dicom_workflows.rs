@@ -88,6 +88,26 @@ fn build_test_dicom() -> (TempDir, PathBuf) {
         VR::IS,
         PrimitiveValue::from("1"),
     )); // Number of Frames
+    obj.put(DataElement::new(
+        Tag(0x0028, 0x1052),
+        VR::DS,
+        PrimitiveValue::from("-1024"),
+    )); // Rescale Intercept
+    obj.put(DataElement::new(
+        Tag(0x0028, 0x1053),
+        VR::DS,
+        PrimitiveValue::from("2"),
+    )); // Rescale Slope
+    obj.put(DataElement::new(
+        Tag(0x0028, 0x1050),
+        VR::DS,
+        PrimitiveValue::from("50"),
+    )); // Window Center
+    obj.put(DataElement::new(
+        Tag(0x0028, 0x1051),
+        VR::DS,
+        PrimitiveValue::from("150"),
+    )); // Window Width
 
     obj.put(DataElement::new(
         Tag(0x7fe0, 0x0010),
@@ -132,10 +152,11 @@ fn pixel_stats_and_image_preview_work() {
 
     let stats = stats::pixel_statistics_for_file(&path).expect("stats");
     assert_eq!(stats.total_pixels, 4);
-    assert!((stats.min - 0.0).abs() < f32::EPSILON);
-    assert!((stats.max - 255.0).abs() < f32::EPSILON);
-    assert!((stats.mean - 111.75).abs() < 0.1);
-    assert!(stats.median.unwrap_or_default() > 90.0 && stats.median.unwrap_or_default() < 100.0);
+    assert!((stats.min - -1024.0).abs() < f32::EPSILON);
+    assert!((stats.max - -514.0).abs() < f32::EPSILON);
+    assert!((stats.mean - -800.5).abs() < 0.1);
+    let median = stats.median.unwrap_or_default();
+    assert!(median < -830.0 && median > -834.0);
 
     let png = image::first_frame_png_bytes(&path).expect("render png");
     assert!(png.starts_with(&[0x89, b'P', b'N', b'G']));
@@ -245,4 +266,28 @@ fn basic_metadata_exposes_dimensions_and_frames() {
     assert_eq!(basic.columns, Some(2));
     assert_eq!(basic.number_of_frames, Some(1));
     assert!(basic.transfer_syntax.is_some());
+}
+
+#[test]
+fn histogram_counts_align_with_pixels() {
+    let (_dir, path) = build_test_dicom();
+    let histogram = stats::histogram_for_file(&path, 8).expect("histogram");
+    let total: u64 = histogram.bins.iter().sum();
+    assert_eq!(total, 4);
+    assert!(histogram.max >= histogram.min);
+}
+
+#[test]
+fn pixel_format_summary_includes_window_and_rescale() {
+    let (_dir, path) = build_test_dicom();
+    let details = stats::pixel_format_for_file(&path).expect("pixel format");
+
+    assert_eq!(details.samples_per_pixel, 1);
+    assert_eq!(details.bits_allocated, 8);
+    assert_eq!(details.bits_stored, 8);
+    assert_eq!(details.pixel_representation, "Unsigned");
+    assert_eq!(details.rescale_intercept, Some(-1024.0));
+    assert_eq!(details.rescale_slope, Some(2.0));
+    assert_eq!(details.window_center, Some(50.0));
+    assert_eq!(details.window_width, Some(150.0));
 }

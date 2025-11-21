@@ -6,7 +6,8 @@ use dicom::core::Tag;
 use dicom::object::{open_file, DefaultDicomObject};
 
 use crate::dicom_access::ElementAccess;
-use crate::models::{BasicMetadata, DetailedMetadata};
+use crate::models::{BasicMetadata, DetailedMetadata, PixelFormatSummary};
+use crate::stats;
 
 fn text_for_tag<T: ElementAccess>(obj: &T, tag: Tag) -> Option<String> {
     obj.element_str(tag)
@@ -137,6 +138,11 @@ pub fn read_detailed_metadata(path: &Path) -> Result<DetailedMetadata> {
 pub fn print_info(path: &Path, verbose: bool) -> Result<()> {
     let obj: DefaultDicomObject = open_file(path).context("Falha ao abrir arquivo DICOM")?;
     let basic = extract_basic_metadata(&obj);
+    let pixel_format = if basic.has_pixel_data {
+        stats::pixel_format_for_file(path).ok()
+    } else {
+        None
+    };
 
     println!("{}", "=".repeat(80));
     println!("DICOM File Information: {:?}", path.file_name().unwrap());
@@ -186,6 +192,10 @@ pub fn print_info(path: &Path, verbose: bool) -> Result<()> {
             .unwrap_or_default()
     );
 
+    if let Some(format) = &pixel_format {
+        print_pixel_format(format);
+    }
+
     if verbose {
         println!("\nALL TAGS (Verbose):");
         for element in obj.iter() {
@@ -194,4 +204,23 @@ pub fn print_info(path: &Path, verbose: bool) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn print_pixel_format(format: &PixelFormatSummary) {
+    println!("  Samples: {}", format.samples_per_pixel);
+    println!("  Photometric: {}", format.photometric_interpretation);
+    if let Some(planar) = &format.planar_configuration {
+        println!("  Planar Configuration: {}", planar);
+    }
+    println!(
+        "  Bits: stored={} allocated={} high_bit={}",
+        format.bits_stored, format.bits_allocated, format.high_bit
+    );
+    println!("  Pixel Representation: {}", format.pixel_representation);
+    if let (Some(center), Some(width)) = (format.window_center, format.window_width) {
+        println!("  Window: center={} width={}", center, width);
+    }
+    if let (Some(slope), Some(intercept)) = (format.rescale_slope, format.rescale_intercept) {
+        println!("  Rescale: slope={} intercept={}", slope, intercept);
+    }
 }

@@ -1,15 +1,34 @@
-use anyhow::Result;
+use anyhow::{bail, Context, Result};
 use dicom::object::open_file;
 use dicom::pixeldata::PixelDecoder;
+use dicom_pixeldata::{ConvertOptions, ModalityLutOption, VoiLutOption, WindowLevel};
 use image::{DynamicImage, ImageFormat};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
-pub fn convert(input: &Path, output: Option<PathBuf>, format: &str) -> Result<()> {
-    let obj = open_file(input)?;
+#[derive(Debug, Clone, Default)]
+pub struct ImageExportOptions {
+    pub frame: Option<u32>,
+    pub window: Option<WindowLevel>,
+    pub normalize: bool,
+    pub disable_modality_lut: bool,
+    pub disable_voi_lut: bool,
+    pub force_8bit: bool,
+    pub force_16bit: bool,
+}
+
+pub fn convert(
+    input: &Path,
+    output: Option<PathBuf>,
+    format: &str,
+    options: &ImageExportOptions,
+) -> Result<()> {
+    let obj = open_file(input).context("Failed to open DICOM file")?;
 
     // Decode pixel data (handles compression when features are enabled)
-    let decoded_image = obj.decode_pixel_data()?;
+    let decoded_image = obj
+        .decode_pixel_data()
+        .context("Failed to decode pixel data")?;
     let num_frames = decoded_image.number_of_frames();
 
     let base_output = output.unwrap_or_else(|| {
@@ -18,24 +37,44 @@ pub fn convert(input: &Path, output: Option<PathBuf>, format: &str) -> Result<()
         p
     });
 
-    if num_frames <= 1 {
-        // Convert into a DynamicImage from the image crate
-        let dynamic_image = decoded_image.to_dynamic_image(0)?; // Frame 0
-        dynamic_image.save(&base_output)?;
-        println!("Image saved to: {:?}", base_output);
-    } else {
-        println!("Multi-frame DICOM detected: {} frames.", num_frames);
-        let parent = base_output.parent().unwrap_or_else(|| Path::new("."));
-        let stem = base_output.file_stem().unwrap().to_string_lossy();
-
-        for i in 0..num_frames {
-            let dynamic_image = decoded_image.to_dynamic_image(i)?;
-            let frame_name = format!("{}_frame{:03}.{}", stem, i, format);
-            let frame_path = parent.join(frame_name);
-
-            dynamic_image.save(&frame_path)?;
-            println!("Saved frame {} to {:?}", i, frame_path);
+    let frames: Vec<u32> = if let Some(frame) = options.frame {
+        if frame >= num_frames {
+            bail!(
+                "Requested frame {} but file has {} frame(s)",
+                frame,
+                num_frames
+            );
         }
+        vec![frame]
+    } else {
+        (0..num_frames).collect()
+    };
+
+    let convert_options = build_convert_options(options);
+
+    if frames.len() == 1 {
+        let dynamic_image =
+            decoded_image.to_dynamic_image_with_options(frames[0], &convert_options)?;
+        dynamic_image
+            .save(&base_output)
+            .with_context(|| format!("Failed to save image to {:?}", base_output))?;
+        println!("Image saved to: {:?} (frame {})", base_output, frames[0]);
+        return Ok(());
+    }
+
+    println!("Multi-frame DICOM detected: {} frames.", num_frames);
+    let parent = base_output.parent().unwrap_or_else(|| Path::new("."));
+    let stem = base_output.file_stem().unwrap().to_string_lossy();
+
+    for i in frames {
+        let dynamic_image = decoded_image.to_dynamic_image_with_options(i, &convert_options)?;
+        let frame_name = format!("{}_frame{:03}.{}", stem, i, format);
+        let frame_path = parent.join(frame_name);
+
+        dynamic_image
+            .save(&frame_path)
+            .with_context(|| format!("Failed to save image to {:?}", frame_path))?;
+        println!("Saved frame {} to {:?}", i, frame_path);
     }
 
     Ok(())
@@ -52,4 +91,28 @@ fn encode_image(image: &DynamicImage, format: ImageFormat) -> Result<Vec<u8>> {
     let mut buffer = Vec::new();
     image.write_to(&mut Cursor::new(&mut buffer), format)?;
     Ok(buffer)
+}
+
+fn build_convert_options(options: &ImageExportOptions) -> ConvertOptions {
+    let mut convert = ConvertOptions::new();
+
+    if options.disable_modality_lut {
+        convert = convert.with_modality_lut(ModalityLutOption::None);
+    }
+
+    if options.disable_voi_lut {
+        convert = convert.with_voi_lut(VoiLutOption::Identity);
+    } else if let Some(window) = &options.window {
+        convert = convert.with_voi_lut(VoiLutOption::Custom(*window));
+    } else if options.normalize {
+        convert = convert.with_voi_lut(VoiLutOption::Normalize);
+    }
+
+    if options.force_16bit {
+        convert = convert.force_16bit();
+    } else if options.force_8bit {
+        convert = convert.force_8bit();
+    }
+
+    convert
 }

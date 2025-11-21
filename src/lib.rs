@@ -2,6 +2,7 @@ pub mod anonymize;
 pub mod batch;
 pub mod cli;
 pub mod dicom_access;
+pub mod dump;
 pub mod image;
 pub mod json;
 pub mod metadata;

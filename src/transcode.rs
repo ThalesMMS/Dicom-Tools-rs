@@ -3,6 +3,7 @@ use dicom::core::{DataElement, PrimitiveValue, Tag, VR};
 use dicom::object::open_file;
 use dicom::pixeldata::PixelDecoder;
 use dicom::transfer_syntax::entries::{EXPLICIT_VR_LITTLE_ENDIAN, IMPLICIT_VR_LITTLE_ENDIAN};
+use dicom_pixeldata::{ConvertOptions, ModalityLutOption, VoiLutOption};
 use std::borrow::Cow;
 use std::path::Path;
 
@@ -31,12 +32,24 @@ pub fn transcode(input: &Path, output: &Path, target_ts: UncompressedTransferSyn
         .decode_pixel_data()
         .context("Failed to decode pixel data")?;
 
-    // 2. Get raw bytes (native)
-    let pixel_bytes = decoded
-        .to_vec()
-        .context("Failed to convert decoded pixels to vector")?;
-
+    // 2. Get raw bytes (native) without applying LUTs
+    let convert_options = ConvertOptions::new()
+        .with_modality_lut(ModalityLutOption::None)
+        .with_voi_lut(VoiLutOption::Identity);
     let bits_allocated = decoded.bits_allocated();
+    let pixel_bytes = if bits_allocated > 8 {
+        let words = decoded
+            .to_vec_with_options::<u16>(&convert_options)
+            .context("Failed to convert decoded pixels to vector")?;
+        words
+            .into_iter()
+            .flat_map(|v| v.to_le_bytes())
+            .collect::<Vec<u8>>()
+    } else {
+        decoded
+            .to_vec_with_options::<u8>(&convert_options)
+            .context("Failed to convert decoded pixels to vector")?
+    };
 
     // Release borrow on obj so we can consume it
     drop(decoded);

@@ -41,3 +41,28 @@ pub struct PixelStatistics {
     pub total_pixels: usize,
     pub shape: Vec<usize>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PixelHistogram {
+    pub bins: Vec<u64>,
+    pub min: f32,
+    pub max: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PixelFormatSummary {
+    pub rows: u32,
+    pub columns: u32,
+    pub number_of_frames: u32,
+    pub samples_per_pixel: u16,
+    pub photometric_interpretation: String,
+    pub planar_configuration: Option<String>,
+    pub bits_allocated: u16,
+    pub bits_stored: u16,
+    pub high_bit: u16,
+    pub pixel_representation: String,
+    pub rescale_slope: Option<f64>,
+    pub rescale_intercept: Option<f64>,
+    pub window_center: Option<f64>,
+    pub window_width: Option<f64>,
+}

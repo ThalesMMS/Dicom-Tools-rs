@@ -2,13 +2,15 @@ use std::fmt::Display;
 use std::net::SocketAddr;
 
 use axum::{
-    extract::{Multipart, Path, State},
+    extract::{Multipart, Path, Query, State},
     http::{header, HeaderValue, StatusCode},
     response::{Html, IntoResponse},
     routing::{get, post},
     Json, Router,
 };
 use dicom::object::open_file;
+use dicom::pixeldata::PixelDecoder;
+use serde::Deserialize;
 use serde_json::{json, Value};
 use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
@@ -43,6 +45,7 @@ pub async fn start_server(host: &str, port: u16) -> anyhow::Result<()> {
         .route("/api/validate/:filename", get(validate_handler))
         .route("/api/json/:filename", get(json_handler))
         .route("/api/download/:filename", get(download_handler))
+        .route("/api/histogram/:filename", get(histogram_handler))
         .with_state(state)
         .layer(CorsLayer::permissive());
 
@@ -84,12 +87,18 @@ async fn upload_handler(
     let info = metadata::extract_basic_metadata(&obj);
     let validation = validate::validate_obj(&obj);
     let summary = validate::as_summary(&validation);
+    let decoded = obj.decode_pixel_data().ok();
+    let pixel_format = decoded
+        .as_ref()
+        .and_then(|d| stats::pixel_format_from_decoded(d).ok())
+        .or_else(|| stats::pixel_format_for_file(&path).ok());
 
     Ok(Json(json!({
         "success": true,
         "filename": saved_name,
         "info": info,
-        "validation": summary
+        "validation": summary,
+        "pixel_format": pixel_format
     })))
 }
 
@@ -109,6 +118,32 @@ async fn get_stats(
     let path = state.store.resolve(&filename).map_err(not_found)?;
     let stats = stats::pixel_statistics_for_file(&path).map_err(internal_error)?;
     Ok(Json(stats))
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct HistogramQuery {
+    bins: Option<usize>,
+}
+
+async fn histogram_handler(
+    State(state): State<AppState>,
+    Path(filename): Path<String>,
+    Query(query): Query<HistogramQuery>,
+) -> ApiResult<Json<Value>> {
+    let bins = query.bins.unwrap_or(256);
+    if bins == 0 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "bins must be greater than 0".into(),
+        ));
+    }
+    let path = state.store.resolve(&filename).map_err(not_found)?;
+    let histogram = stats::histogram_for_file(&path, bins).map_err(internal_error)?;
+    Ok(Json(json!({
+        "bins": histogram.bins,
+        "min": histogram.min,
+        "max": histogram.max
+    })))
 }
 
 async fn get_image_preview(
