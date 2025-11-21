@@ -1,8 +1,11 @@
 mod anonymize;
 mod batch;
 mod image;
+mod json;
 mod metadata;
 mod scu;
+mod stats;
+mod transcode;
 mod validate;
 mod web;
 
@@ -66,6 +69,28 @@ enum Commands {
         addr: String,
         file: PathBuf,
     },
+    /// Convert DICOM to JSON
+    ToJson {
+        file: PathBuf,
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
+    /// Convert JSON to DICOM
+    FromJson {
+        input: PathBuf,
+        #[arg(short, long)]
+        output: PathBuf,
+    },
+    /// Transcode a DICOM file (Decompress)
+    Transcode {
+        input: PathBuf,
+        #[arg(short, long)]
+        output: PathBuf,
+    },
+    /// Calculate Pixel Statistics
+    Stats {
+        file: PathBuf,
+    },
 }
 
 #[tokio::main]
@@ -81,6 +106,10 @@ async fn main() -> anyhow::Result<()> {
         Commands::Batch { directory, operation } => batch::process_directory(&directory, &operation)?,
         Commands::Echo { addr } => scu::echo(&addr)?,
         Commands::Push { addr, file } => scu::push(&addr, &file)?,
+        Commands::ToJson { file, output } => json::to_json(&file, output.as_deref())?,
+        Commands::FromJson { input, output } => json::from_json(&input, &output)?,
+        Commands::Transcode { input, output } => transcode::transcode(&input, &output)?,
+        Commands::Stats { file } => stats::stats(&file)?,
     }
 
     Ok(())

@@ -1,56 +1,93 @@
 # DICOM Tools (Rust)
 
-Command-line and web helpers for inspecting, anonymizing, validating, and converting DICOM files. Built with `dicom-rs`, Axum, and Tokio for fast local workflows and lightweight demos.
+A robust command-line interface (CLI) and web utility for processing DICOM medical imaging files. Built with Rust, it leverages the `dicom-rs` ecosystem for core operations, offering high performance, type safety, and modern tooling integration.
 
-## Project Layout
-- `src/main.rs`: CLI entry using Clap.
-- `src/anonymize.rs`, `src/metadata.rs`, `src/image.rs`, `src/validate.rs`: Core DICOM operations.
-- `src/batch.rs`: Parallel directory processing (WalkDir + Rayon).
-- `src/web.rs` + `src/templates/index.html`: Simple Axum server and static UI.
-- `Cargo.toml`: Dependencies and crate metadata.
+## Project Overview
 
-## Prerequisites
-- Rust toolchain (stable 1.75+ recommended) with `cargo`.
-- Sample DICOM files for testing (keep them anonymized).
+This project provides a suite of tools to:
+- **Inspect:** Extract and view DICOM metadata tags in detail.
+- **Anonymize:** Smart redaction of Patient Information (PII) based on Value Representations (VR). Automatically masks Names (`PN`), Dates (`DA`), and Times (`TM`) while hashing `PatientID`.
+- **Convert:** Transform DICOM pixel data into standard image formats (PNG/JPG). Fully supports **multi-frame** images (videos/volumes) by extracting all frames.
+- **JSON:** Bi-directional conversion between DICOM files and DICOM JSON representations for interoperability.
+- **Validate:** Deep inspection of DICOM files, checking for critical attributes (SOP Class, Patient Info, Pixel Data) and standard compliance.
+- **Network (Experimental):** Basic DICOM SCU capabilities (`echo`, `push`) to interact with PACS (currently in early development).
+- **Serve:** A lightweight web server (`Axum`) for demonstrating these capabilities via a browser.
 
-## Build and Run
-Install deps and check the project:
+### Key Technologies
+- **Language:** Rust (Edition 2021)
+- **CLI:** `clap` (v4)
+- **DICOM:** `dicom-rs` ecosystem (`dicom-core`, `dicom-object`, `dicom-pixeldata`, `dicom-ul`, `dicom-json`)
+- **Web:** `axum` (v0.7), `tokio` (v1)
+- **Concurrency:** `rayon` (v1.8)
+
+## Architecture
+
+The project is structured as a single binary with modularized functionality:
+
+- **`src/main.rs`**: Application entry point and CLI dispatch.
+- **`src/anonymize.rs`**: Generic VR-based anonymization logic.
+- **`src/image.rs`**: Pixel data extraction and multi-frame image conversion.
+- **`src/json.rs`**: DICOM <-> JSON conversion utilities.
+- **`src/validate.rs`**: Deep validation of DICOM attributes and structure.
+- **`src/scu.rs`**: Experimental DICOM networking (C-ECHO, C-STORE).
+- **`src/web.rs`**: Axum web server implementation.
+- **`src/batch.rs`**: Parallel directory processing.
+- **`src/metadata.rs`**: Metadata extraction utilities.
+
+## Building and Running
+
+### Prerequisites
+- **Rust Toolchain:** Stable Rust version installed (1.75+ recommended).
+
+### Development Commands
+
+| Action | Command | Description |
+| :--- | :--- | :--- |
+| **Build** | `cargo build` | Compiles the project in debug mode. |
+| **Check** | `cargo check` | Fast compilation check. |
+| **Test** | `cargo test` | Runs unit and integration tests. |
+| **Format** | `cargo fmt --all` | Formats code to Rust standards. |
+| **Lint** | `cargo clippy --all-targets --all-features` | Runs the linter. |
+
+### Usage Examples
+
+**CLI Mode:**
+
 ```bash
-cargo check
-cargo fmt --all
-cargo clippy --all-targets --all-features
+# Extract metadata
+cargo run -- info path/to/image.dcm --verbose
+
+# Anonymize a file (Smart VR-based)
+cargo run -- anonymize path/to/image.dcm --output output/clean.dcm
+
+# Convert to PNG (Extracts all frames for multi-frame files)
+cargo run -- to-image path/to/image.dcm --format png
+
+# Convert to JSON
+cargo run -- to-json path/to/image.dcm --output metadata.json
+
+# Create DICOM from JSON
+cargo run -- from-json metadata.json --output restored.dcm
+
+# Validate a file (Deep check)
+cargo run -- validate path/to/image.dcm
+
+# Network Echo (Experimental)
+cargo run -- echo 127.0.0.1:104
+
+# Batch anonymize a directory
+cargo run -- batch --directory ./data/patients --operation anonymize
 ```
 
-Run commands locally:
+**Web Mode:**
+
 ```bash
-# Extract metadata (verbose prints all tags)
-cargo run -- info path/to/file.dcm --verbose
-
-# Anonymize into <name>_anon.dcm unless --output is provided
-cargo run -- anonymize path/to/file.dcm --output out/clean.dcm
-
-# Convert to image (default png)
-cargo run -- to-image path/to/file.dcm --format jpg
-
-# Validate basic integrity
-cargo run -- validate path/to/file.dcm
-
-# Batch over a directory (operation: anonymize|validate)
-cargo run -- batch --directory ./cases --operation anonymize
+# Start the server on localhost:3000
+cargo run -- web --host 127.0.0.1 --port 3000
 ```
 
-Start the web demo:
-```bash
-cargo run -- web --host 0.0.0.0 --port 3000
-```
-Then open `http://localhost:3000` and use the upload UI.
+## Development Conventions
 
-## Coding Style and Quality
-- Format with `cargo fmt --all`.
-- Lint with `cargo clippy --all-targets --all-features`; address warnings or justify them in reviews.
-- Add `#[cfg(test)]` unit tests next to implementations; keep fixtures under `tests/data` if needed.
-
-## Contributing
-- Follow the guidelines in `AGENTS.md` (project-specific instructions, commands, and review expectations).
-- Use imperative, concise commit messages and document any manual test commands in pull requests.
-- Do not commit real PHI; only use synthetic or anonymized DICOM samples.
+- **Code Style:** Adhere strictly to `rustfmt` and `clippy` defaults.
+- **Error Handling:** Use `anyhow` for top-level error reporting.
+- **Safety:** Do not commit real Protected Health Information (PHI). Use synthetic or anonymized DICOM data for testing.

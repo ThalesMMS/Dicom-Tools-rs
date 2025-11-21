@@ -6,10 +6,11 @@ edition = "2021"
 [dependencies]
 # Core DICOM
 dicom = "0.7"
-dicom-pixeldata = { version = "0.7", features = ["image"] } # Para manipulação de imagem
+dicom-pixeldata = { version = "0.7", features = ["image", "ndarray"] } # Para manipulação de imagem
 dicom-ul = "0.7"        # Para networking (SCU)
 dicom-object = "0.7"
 dicom-core = "0.7"
+dicom-dictionary-std = "0.7"
 
 # CLI e Utilitários
 clap = { version = "4.4", features = ["derive"] }
@@ -23,6 +24,7 @@ hex = "0.4"
 
 # Imagem
 image = "0.24"
+ndarray = "0.15"
 
 # Web Server (Axum)
 tokio = { version = "1", features = ["full"] }
@@ -32,3 +34,4 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tracing = "0.1"
 tracing-subscriber = "0.3"
+dicom-json = "0.7"
