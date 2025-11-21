@@ -10,3 +10,4 @@
 # Local env overrides
 /.env
 AGENTS.md
+GEMINI.md
