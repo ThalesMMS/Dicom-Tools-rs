@@ -13,18 +13,7 @@ use std::path::Path;
 
 /// Convert a DICOM file to JSON and print it to stdout.
 pub fn to_json(input: &Path, output: Option<&Path>) -> Result<()> {
-    let obj = open_file(input).context("Failed to open DICOM file")?;
-
-    // Now that versions align, &obj (FileDicomObject) should convert to DicomJson via From/Into if supported,
-    // or we use the inner object.
-
-    let inner_obj: &InMemDicomObject<StandardDataDictionary> = &*obj;
-    // In dicom-json 0.7, DicomJson::from might expect specific types.
-    // If `DicomJson::from(&InMemDicomObject)` exists, we use it.
-    let json_obj = DicomJson::from(inner_obj);
-
-    let json_string =
-        serde_json::to_string_pretty(&json_obj).context("Failed to serialize to JSON")?;
+    let json_string = to_json_string(input)?;
 
     match output {
         Some(path) => {
@@ -37,6 +26,18 @@ pub fn to_json(input: &Path, output: Option<&Path>) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Convert a DICOM file into a pretty JSON string without touching the filesystem.
+pub fn to_json_string(input: &Path) -> Result<String> {
+    let obj = open_file(input).context("Failed to open DICOM file")?;
+
+    let inner_obj: &InMemDicomObject<StandardDataDictionary> = &*obj;
+    let json_obj = DicomJson::from(inner_obj);
+
+    let json_string =
+        serde_json::to_string_pretty(&json_obj).context("Failed to serialize to JSON")?;
+    Ok(json_string)
 }
 
 /// Create a DICOM file from a JSON source.

@@ -10,6 +10,7 @@ This project provides a suite of tools to:
 - **Convert:** Transform DICOM pixel data into standard image formats (PNG/JPG). Fully supports **multi-frame** images (videos/volumes) by extracting all frames.
 - **JSON:** Bi-directional conversion between DICOM files and DICOM JSON representations for interoperability.
 - **Validate:** Deep inspection of DICOM files, checking for critical attributes (SOP Class, Patient Info, Pixel Data) and standard compliance.
+- **Transcode:** Re-encode to uncompressed syntaxes (Explicit/Implicit VR Little Endian) while keeping pixel data intact.
 - **Network (Experimental):** Basic DICOM SCU capabilities (`echo`, `push`) to interact with PACS (currently in early development).
 - **Serve:** A lightweight web server (`Axum`) for demonstrating these capabilities via a browser.
 
@@ -33,6 +34,9 @@ The project is structured as a single binary with modularized functionality:
 - **`src/web.rs`**: Axum web server implementation.
 - **`src/batch.rs`**: Parallel directory processing.
 - **`src/metadata.rs`**: Metadata extraction utilities.
+- **`src/stats.rs`**: Pixel statistics helpers used by CLI and web.
+- **`src/storage.rs`**: Sandboxed upload store for the web UI.
+- **`src/templates/index.html`**: Single-page UI for uploads, previews, JSON/metadata views.
 
 ## Building and Running
 
@@ -71,6 +75,9 @@ cargo run -- from-json metadata.json --output restored.dcm
 
 # Validate a file (Deep check)
 cargo run -- validate path/to/image.dcm
+
+# Transcode to implicit VR little endian
+cargo run -- transcode path/to/image.dcm --output output/clean.dcm --transfer-syntax implicit-vr-little-endian
 
 # Network Echo (Experimental)
 cargo run -- echo 127.0.0.1:104

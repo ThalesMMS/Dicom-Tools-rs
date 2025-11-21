@@ -175,10 +175,13 @@
                     <div class="info-card"><div class="info-label">Modality</div><div class="info-value" id="infoModality">—</div></div>
                     <div class="info-card"><div class="info-label">Study Date</div><div class="info-value" id="infoStudyDate">—</div></div>
                     <div class="info-card"><div class="info-label">Pixel Data</div><div class="info-value" id="infoPixel">—</div></div>
+                    <div class="info-card"><div class="info-label">Transfer Syntax</div><div class="info-value" id="infoTransferSyntax">—</div></div>
+                    <div class="info-card"><div class="info-label">Dimensions / Frames</div><div class="info-value" id="infoDimensions">—</div></div>
                 </div>
 
                 <div class="actions">
                     <button class="btn secondary" onclick="showMetadata()">View Metadata</button>
+                    <button class="btn secondary" onclick="showJson()">View JSON</button>
                     <button class="btn secondary" onclick="showStats()">Pixel Stats</button>
                     <button class="btn" onclick="validateFile()">Validate</button>
                     <button class="btn danger" onclick="anonymize()">Anonymize & Download</button>
@@ -234,6 +237,10 @@
             document.getElementById('infoModality').textContent = info.modality || 'N/A';
             document.getElementById('infoStudyDate').textContent = info.study_date || 'N/A';
             document.getElementById('infoPixel').textContent = info.has_pixel_data ? 'Present' : 'None';
+            document.getElementById('infoTransferSyntax').textContent = info.transfer_syntax || 'Unknown';
+            const dims = (info.rows && info.columns) ? `${info.rows} × ${info.columns}` : 'N/A';
+            const frames = info.number_of_frames ? `${info.number_of_frames} frame${info.number_of_frames > 1 ? 's' : ''}` : '1 frame?';
+            document.getElementById('infoDimensions').textContent = `${dims} · ${frames}`;
         }
 
         async function uploadFile(file) {
@@ -312,6 +319,7 @@
                     { label: 'Median', value: data.median ? data.median.toFixed(2) : 'N/A' },
                     { label: 'Std Dev', value: data.std_dev ? data.std_dev.toFixed(2) : 'N/A' },
                     { label: 'Total Pixels', value: data.total_pixels?.toLocaleString() },
+                    { label: 'Shape', value: Array.isArray(data.shape) ? data.shape.join(' × ') : '—' },
                 ];
 
                 let html = '<h3>Pixel Statistics</h3><div class="stat-grid">';
@@ -323,6 +331,30 @@
             } catch (error) {
                 viewerContent.innerHTML = '<div class="alert error">Failed to compute statistics.</div>';
             }
+
+        async function showJson() {
+            if (!state.currentFilename) return alert('Load a file first.');
+            viewerContent.innerHTML = '<p style="text-align:center;color:var(--muted);">Generating JSON…</p>';
+
+            try {
+                const response = await fetch(`/api/json/${state.currentFilename}`);
+                const data = await response.json();
+                const pretty = JSON.stringify(data, null, 2);
+                const pre = document.createElement('pre');
+                pre.style.background = 'rgba(255,255,255,0.04)';
+                pre.style.border = `1px solid var(--border)`;
+                pre.style.padding = '12px';
+                pre.style.borderRadius = '10px';
+                pre.style.overflow = 'auto';
+                pre.textContent = pretty;
+                viewerContent.innerHTML = '<h3>Dicom JSON</h3>';
+                viewerContent.appendChild(pre);
+                updateStatus('JSON view ready');
+            } catch (error) {
+                viewerContent.innerHTML = '<div class="alert error">Failed to render JSON.</div>';
+                updateStatus('JSON view failed', 'error');
+            }
+        }
         }
 
         async function anonymize() {

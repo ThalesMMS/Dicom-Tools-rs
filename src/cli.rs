@@ -71,6 +71,13 @@ pub enum Commands {
         input: PathBuf,
         #[arg(short, long)]
         output: PathBuf,
+        #[arg(
+            long,
+            value_enum,
+            default_value_t = TransferSyntax::ExplicitVrLittleEndian,
+            help = "Target transfer syntax (uncompressed only)"
+        )]
+        transfer_syntax: TransferSyntax,
     },
     /// Calculate Pixel Statistics
     Stats { file: PathBuf },
@@ -80,6 +87,25 @@ pub enum Commands {
 pub enum BatchOperation {
     Anonymize,
     Validate,
+}
+
+#[derive(Copy, Clone, Debug, ValueEnum)]
+pub enum TransferSyntax {
+    ExplicitVrLittleEndian,
+    ImplicitVrLittleEndian,
+}
+
+impl From<TransferSyntax> for transcode::UncompressedTransferSyntax {
+    fn from(value: TransferSyntax) -> Self {
+        match value {
+            TransferSyntax::ExplicitVrLittleEndian => {
+                transcode::UncompressedTransferSyntax::ExplicitVRLittleEndian
+            }
+            TransferSyntax::ImplicitVrLittleEndian => {
+                transcode::UncompressedTransferSyntax::ImplicitVRLittleEndian
+            }
+        }
+    }
 }
 
 pub async fn run() -> anyhow::Result<()> {
@@ -103,7 +129,11 @@ pub async fn run() -> anyhow::Result<()> {
         Commands::Push { addr, file } => scu::push(&addr, &file)?,
         Commands::ToJson { file, output } => json::to_json(&file, output.as_deref())?,
         Commands::FromJson { input, output } => json::from_json(&input, &output)?,
-        Commands::Transcode { input, output } => transcode::transcode(&input, &output)?,
+        Commands::Transcode {
+            input,
+            output,
+            transfer_syntax,
+        } => transcode::transcode(&input, &output, transfer_syntax.into())?,
         Commands::Stats { file } => stats::stats(&file)?,
     }
 

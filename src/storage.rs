@@ -69,3 +69,33 @@ fn sanitize_filename(input: &str) -> String {
         .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn sanitize_strips_dangerous_characters() {
+        let cleaned = sanitize_filename("../weird name 123.dcm");
+        assert_eq!(cleaned, "weirdname123dcm");
+    }
+
+    #[test]
+    fn resolve_rejects_paths_outside_root() {
+        let root = tempdir().expect("tmpdir");
+        let store_root = root.path().join("safe-area");
+        fs::create_dir_all(&store_root).expect("create nested root");
+        let store = FileStore::new(&store_root).expect("store");
+
+        let outside = root.path().join("escape.dcm");
+        fs::write(&outside, b"attack").expect("write outside file");
+
+        assert!(store.resolve("../escape.dcm").is_err());
+
+        let legit = store.save(Some("patient^file.dcm"), b"abc").expect("save");
+        let resolved = store.resolve(&legit).expect("resolve legit");
+        let canonical_root = store_root.canonicalize().expect("canonical root");
+        assert!(resolved.starts_with(&canonical_root));
+    }
+}

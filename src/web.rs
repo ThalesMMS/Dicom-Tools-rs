@@ -14,7 +14,7 @@ use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
 
 use crate::{
-    anonymize, image, metadata,
+    anonymize, image, json, metadata,
     models::{DetailedMetadata, PixelStatistics, ValidationSummary},
     stats,
     storage::FileStore,
@@ -41,6 +41,7 @@ pub async fn start_server(host: &str, port: u16) -> anyhow::Result<()> {
         .route("/api/image/:filename", get(get_image_preview))
         .route("/api/anonymize/:filename", post(anonymize_handler))
         .route("/api/validate/:filename", get(validate_handler))
+        .route("/api/json/:filename", get(json_handler))
         .route("/api/download/:filename", get(download_handler))
         .with_state(state)
         .layer(CorsLayer::permissive());
@@ -151,6 +152,16 @@ async fn validate_handler(
         "missing_tags": summary.missing_tags,
         "has_pixel_data": summary.has_pixel_data
     })))
+}
+
+async fn json_handler(
+    State(state): State<AppState>,
+    Path(filename): Path<String>,
+) -> ApiResult<Json<Value>> {
+    let path = state.store.resolve(&filename).map_err(not_found)?;
+    let json_string = json::to_json_string(&path).map_err(internal_error)?;
+    let value: Value = serde_json::from_str(&json_string).map_err(internal_error)?;
+    Ok(Json(value))
 }
 
 async fn download_handler(

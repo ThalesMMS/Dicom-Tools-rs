@@ -2,13 +2,28 @@ use anyhow::{Context, Result};
 use dicom::core::{DataElement, PrimitiveValue, Tag, VR};
 use dicom::object::open_file;
 use dicom::pixeldata::PixelDecoder;
-use dicom::transfer_syntax::entries::EXPLICIT_VR_LITTLE_ENDIAN;
+use dicom::transfer_syntax::entries::{EXPLICIT_VR_LITTLE_ENDIAN, IMPLICIT_VR_LITTLE_ENDIAN};
 use std::borrow::Cow;
 use std::path::Path;
 
-/// Transcode a DICOM file to Explicit VR Little Endian (Uncompressed).
-/// Currently only supports transcoding TO uncompressed syntaxes.
-pub fn transcode(input: &Path, output: &Path) -> Result<()> {
+/// Supported uncompressed transfer syntaxes for transcoding.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum UncompressedTransferSyntax {
+    ExplicitVRLittleEndian,
+    ImplicitVRLittleEndian,
+}
+
+impl UncompressedTransferSyntax {
+    fn uid(self) -> &'static str {
+        match self {
+            UncompressedTransferSyntax::ExplicitVRLittleEndian => EXPLICIT_VR_LITTLE_ENDIAN.uid(),
+            UncompressedTransferSyntax::ImplicitVRLittleEndian => IMPLICIT_VR_LITTLE_ENDIAN.uid(),
+        }
+    }
+}
+
+/// Transcode a DICOM file to an uncompressed transfer syntax (explicit or implicit VR LE).
+pub fn transcode(input: &Path, output: &Path, target_ts: UncompressedTransferSyntax) -> Result<()> {
     let obj = open_file(input).context("Failed to open DICOM file")?;
 
     // 1. Decode Pixel Data
@@ -59,7 +74,7 @@ pub fn transcode(input: &Path, output: &Path) -> Result<()> {
         .unwrap_or(Cow::Borrowed("1.2.3.4.5"));
 
     let file_meta = FileMetaTableBuilder::new()
-        .transfer_syntax(EXPLICIT_VR_LITTLE_ENDIAN.uid())
+        .transfer_syntax(target_ts.uid())
         .media_storage_sop_class_uid(sop_class_uid.as_ref())
         .media_storage_sop_instance_uid(sop_instance_uid.as_ref())
         .build()?;
@@ -76,7 +91,7 @@ pub fn transcode(input: &Path, output: &Path) -> Result<()> {
     file_obj
         .write_to_file(output)
         .context("Failed to write output file")?;
-    println!("Transcoded to Explicit VR Little Endian: {:?}", output);
+    println!("Transcoded to {}: {:?}", target_ts.uid(), output);
 
     Ok(())
 }

@@ -10,6 +10,10 @@ pub struct BasicMetadata {
     pub modality: Option<String>,
     pub sop_class_uid: Option<String>,
     pub has_pixel_data: bool,
+    pub transfer_syntax: Option<String>,
+    pub rows: Option<u32>,
+    pub columns: Option<u32>,
+    pub number_of_frames: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

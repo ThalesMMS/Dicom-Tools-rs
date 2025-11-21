@@ -12,6 +12,10 @@ fn text_for_tag<T: ElementAccess>(obj: &T, tag: Tag) -> Option<String> {
     obj.element_str(tag)
 }
 
+fn uint_for_tag<T: ElementAccess>(obj: &T, tag: Tag) -> Option<u32> {
+    obj.element_u32(tag)
+}
+
 fn insert_if(map: &mut BTreeMap<String, String>, label: &str, value: Option<String>) {
     if let Some(value) = value {
         map.insert(label.to_string(), value);
@@ -25,6 +29,10 @@ pub fn extract_basic_metadata<T: ElementAccess>(obj: &T) -> BasicMetadata {
     let modality = text_for_tag(obj, Tag(0x0008, 0x0060));
     let sop_class_uid = text_for_tag(obj, Tag(0x0008, 0x0016));
     let has_pixel_data = obj.has_element(Tag(0x7fe0, 0x0010));
+    let transfer_syntax = obj.transfer_syntax();
+    let rows = uint_for_tag(obj, Tag(0x0028, 0x0010));
+    let columns = uint_for_tag(obj, Tag(0x0028, 0x0011));
+    let number_of_frames = uint_for_tag(obj, Tag(0x0028, 0x0008));
 
     BasicMetadata {
         patient_name,
@@ -33,6 +41,10 @@ pub fn extract_basic_metadata<T: ElementAccess>(obj: &T) -> BasicMetadata {
         modality,
         sop_class_uid,
         has_pixel_data,
+        transfer_syntax,
+        rows,
+        columns,
+        number_of_frames,
     }
 }
 
@@ -82,6 +94,11 @@ pub fn extract_detailed_metadata<T: ElementAccess>(obj: &T) -> DetailedMetadata 
         &mut image,
         "Photometric Interpretation",
         text_for_tag(obj, Tag(0x0028, 0x0004)),
+    );
+    insert_if(
+        &mut image,
+        "Number of Frames",
+        text_for_tag(obj, Tag(0x0028, 0x0008)),
     );
 
     let mut misc = BTreeMap::new();
@@ -135,6 +152,13 @@ pub fn print_info(path: &Path, verbose: bool) -> Result<()> {
         "  SOP Class: {}",
         basic.sop_class_uid.as_deref().unwrap_or("N/A")
     );
+    println!(
+        "  Transfer Syntax: {}",
+        basic
+            .transfer_syntax
+            .as_deref()
+            .unwrap_or("Unknown (in-memory)")
+    );
 
     println!("\nIMAGE");
     println!("  Modality: {}", basic.modality.as_deref().unwrap_or("N/A"));
@@ -145,6 +169,21 @@ pub fn print_info(path: &Path, verbose: bool) -> Result<()> {
         } else {
             "absent"
         }
+    );
+    println!(
+        "  Dimensions: {} x {}{}",
+        basic
+            .rows
+            .map(|r| r.to_string())
+            .unwrap_or_else(|| "?".into()),
+        basic
+            .columns
+            .map(|c| c.to_string())
+            .unwrap_or_else(|| "?".into()),
+        basic
+            .number_of_frames
+            .map(|f| format!(" ({} frame{})", f, if f == 1 { "" } else { "s" }))
+            .unwrap_or_default()
     );
 
     if verbose {

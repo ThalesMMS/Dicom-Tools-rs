@@ -5,6 +5,7 @@ use dicom::object::{DefaultDicomObject, InMemDicomObject};
 /// Small helper trait to pull string values from different DICOM object shapes.
 pub trait ElementAccess {
     fn element_str(&self, tag: Tag) -> Option<String>;
+    fn element_u32(&self, tag: Tag) -> Option<u32>;
     fn has_element(&self, tag: Tag) -> bool;
     fn transfer_syntax(&self) -> Option<String>;
 }
@@ -15,6 +16,13 @@ impl ElementAccess for DefaultDicomObject {
             .ok()
             .and_then(|e| e.to_str().ok())
             .map(|s| s.into_owned())
+    }
+
+    fn element_u32(&self, tag: Tag) -> Option<u32> {
+        self.element(tag)
+            .ok()
+            .and_then(|e| e.to_str().ok())
+            .and_then(|s| s.into_owned().trim().parse::<u32>().ok())
     }
 
     fn has_element(&self, tag: Tag) -> bool {
@@ -32,6 +40,13 @@ impl ElementAccess for InMemDicomObject<StandardDataDictionary> {
             .ok()
             .and_then(|e| e.to_str().ok())
             .map(|s| s.into_owned())
+    }
+
+    fn element_u32(&self, tag: Tag) -> Option<u32> {
+        self.element(tag)
+            .ok()
+            .and_then(|e| e.to_str().ok())
+            .and_then(|s| s.into_owned().trim().parse::<u32>().ok())
     }
 
     fn has_element(&self, tag: Tag) -> bool {

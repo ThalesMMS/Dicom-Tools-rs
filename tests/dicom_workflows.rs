@@ -4,7 +4,7 @@ use dicom::core::{DataElement, PrimitiveValue, Tag, VR};
 use dicom::dictionary_std::StandardDataDictionary;
 use dicom::object::{FileDicomObject, FileMetaTableBuilder, InMemDicomObject};
 use dicom::transfer_syntax::entries::EXPLICIT_VR_LITTLE_ENDIAN;
-use dicom_tools::{anonymize, image, metadata, stats, transcode, validate};
+use dicom_tools::{anonymize, image, json, metadata, stats, transcode, validate};
 use tempfile::{tempdir, TempDir};
 
 fn build_test_dicom() -> (TempDir, PathBuf) {
@@ -83,6 +83,11 @@ fn build_test_dicom() -> (TempDir, PathBuf) {
         VR::CS,
         PrimitiveValue::from("MONOCHROME2"),
     ));
+    obj.put(DataElement::new(
+        Tag(0x0028, 0x0008),
+        VR::IS,
+        PrimitiveValue::from("1"),
+    )); // Number of Frames
 
     obj.put(DataElement::new(
         Tag(0x7fe0, 0x0010),
@@ -157,7 +162,12 @@ fn transcode_keeps_pixel_data_intact() {
     let (_dir, path) = build_test_dicom();
     let output = path.with_file_name("sample_transcoded.dcm");
 
-    transcode::transcode(&path, &output).expect("transcode");
+    transcode::transcode(
+        &path,
+        &output,
+        transcode::UncompressedTransferSyntax::ExplicitVRLittleEndian,
+    )
+    .expect("transcode");
 
     let baseline = stats::pixel_statistics_for_file(&path).expect("baseline stats");
     let transcoded = stats::pixel_statistics_for_file(&output).expect("transcoded stats");
@@ -165,4 +175,74 @@ fn transcode_keeps_pixel_data_intact() {
     assert_eq!(baseline.total_pixels, transcoded.total_pixels);
     assert!((baseline.min - transcoded.min).abs() < f32::EPSILON);
     assert!((baseline.max - transcoded.max).abs() < f32::EPSILON);
+}
+
+#[test]
+fn transcode_to_implicit_vr_le_changes_meta() {
+    let (_dir, path) = build_test_dicom();
+    let output = path.with_file_name("sample_transcoded_implicit.dcm");
+
+    transcode::transcode(
+        &path,
+        &output,
+        transcode::UncompressedTransferSyntax::ImplicitVRLittleEndian,
+    )
+    .expect("transcode implicit");
+
+    let transcoded = dicom::object::open_file(&output).expect("open transcoded");
+    let ts_uid = transcoded.meta().transfer_syntax();
+    assert_eq!(
+        ts_uid,
+        dicom::transfer_syntax::entries::IMPLICIT_VR_LITTLE_ENDIAN.uid()
+    );
+}
+
+#[test]
+fn json_roundtrip_preserves_pixels_and_attributes() {
+    let (_dir, path) = build_test_dicom();
+    let json_path = path.with_file_name("sample.json");
+    let roundtrip = path.with_file_name("sample_roundtrip.dcm");
+
+    json::to_json(&path, Some(&json_path)).expect("to json");
+    json::from_json(&json_path, &roundtrip).expect("from json");
+
+    let original = dicom::object::open_file(&path).expect("open original");
+    let restored = dicom::object::open_file(&roundtrip).expect("open roundtrip");
+
+    let original_name = original
+        .element(Tag(0x0010, 0x0010))
+        .expect("name")
+        .to_str()
+        .unwrap();
+    let restored_name = restored
+        .element(Tag(0x0010, 0x0010))
+        .expect("name")
+        .to_str()
+        .unwrap();
+    assert_eq!(original_name, restored_name);
+
+    let original_pixels = original
+        .element(Tag(0x7FE0, 0x0010))
+        .expect("pixels")
+        .to_bytes()
+        .unwrap()
+        .into_owned();
+    let restored_pixels = restored
+        .element(Tag(0x7FE0, 0x0010))
+        .expect("pixels")
+        .to_bytes()
+        .unwrap()
+        .into_owned();
+    assert_eq!(original_pixels, restored_pixels);
+}
+
+#[test]
+fn basic_metadata_exposes_dimensions_and_frames() {
+    let (_dir, path) = build_test_dicom();
+    let basic = metadata::read_basic_metadata(&path).expect("basic");
+
+    assert_eq!(basic.rows, Some(2));
+    assert_eq!(basic.columns, Some(2));
+    assert_eq!(basic.number_of_frames, Some(1));
+    assert!(basic.transfer_syntax.is_some());
 }
