@@ -1,3 +1,11 @@
+//
+// dicom_workflows.rs
+// Dicom-Tools-rs
+//
+// Integration-style tests covering metadata extraction, validation, pixel stats, image export, anonymization, transcoding, and JSON round-trips.
+//
+// Thales Matheus Mendonça Santos - November 2025
+
 use std::path::PathBuf;
 
 use dicom::core::{DataElement, PrimitiveValue, Tag, VR};
@@ -8,6 +16,7 @@ use dicom_tools::{anonymize, image, json, metadata, stats, transcode, validate};
 use tempfile::{tempdir, TempDir};
 
 fn build_test_dicom() -> (TempDir, PathBuf) {
+    // Construct a tiny Secondary Capture instance with predictable pixel values.
     let dir = tempdir().expect("tempdir");
     let path = dir.path().join("sample.dcm");
 
@@ -135,6 +144,7 @@ fn build_test_dicom() -> (TempDir, PathBuf) {
 fn metadata_and_validation_cover_required_tags() {
     let (_dir, path) = build_test_dicom();
 
+    // Verify that the CLI-friendly metadata struct is populated.
     let basic = metadata::read_basic_metadata(&path).expect("basic metadata");
     assert_eq!(basic.patient_name.as_deref(), Some("Test^Patient"));
     assert_eq!(basic.modality.as_deref(), Some("OT"));
@@ -150,6 +160,7 @@ fn metadata_and_validation_cover_required_tags() {
 fn pixel_stats_and_image_preview_work() {
     let (_dir, path) = build_test_dicom();
 
+    // Ensure that basic statistics are computed and the image renderer emits PNG bytes.
     let stats = stats::pixel_statistics_for_file(&path).expect("stats");
     assert_eq!(stats.total_pixels, 4);
     assert!((stats.min - -1024.0).abs() < f32::EPSILON);

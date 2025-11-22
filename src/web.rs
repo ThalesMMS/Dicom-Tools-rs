@@ -1,3 +1,11 @@
+//
+// web.rs
+// Dicom-Tools-rs
+//
+// Axum-based HTTP server exposing upload, metadata, image preview, anonymization, and validation APIs.
+//
+// Thales Matheus Mendonça Santos - November 2025
+
 use std::fmt::Display;
 use std::net::SocketAddr;
 
@@ -30,6 +38,7 @@ struct AppState {
 
 type ApiResult<T> = Result<T, (StatusCode, String)>;
 
+/// Bootstraps the Axum HTTP server and wires up API routes.
 pub async fn start_server(host: &str, port: u16) -> anyhow::Result<()> {
     let state = AppState {
         store: FileStore::new("target/uploads")?,
@@ -68,6 +77,7 @@ async fn upload_handler(
     let mut original_name = None;
     let mut data = None;
 
+    // Find the first part named "file" and pull bytes eagerly.
     while let Some(field) = multipart.next_field().await.map_err(bad_request)? {
         if field.name() == Some("file") {
             original_name = field.file_name().map(|s| s.to_string());
@@ -83,6 +93,7 @@ async fn upload_handler(
         .map_err(internal_error)?;
     let path = state.store.resolve(&saved_name).map_err(internal_error)?;
 
+    // Parse once so we can return metadata, validation, and pixel information together.
     let obj = open_file(&path).map_err(internal_error)?;
     let info = metadata::extract_basic_metadata(&obj);
     let validation = validate::validate_obj(&obj);
@@ -106,6 +117,7 @@ async fn get_metadata(
     State(state): State<AppState>,
     Path(filename): Path<String>,
 ) -> ApiResult<Json<DetailedMetadata>> {
+    // Detailed metadata is read lazily when requested to keep uploads fast.
     let path = state.store.resolve(&filename).map_err(not_found)?;
     let detailed = metadata::read_detailed_metadata(&path).map_err(internal_error)?;
     Ok(Json(detailed))
@@ -151,6 +163,7 @@ async fn get_image_preview(
     Path(filename): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
     let path = state.store.resolve(&filename).map_err(not_found)?;
+    // Render the first frame to PNG bytes so the UI can embed an <img>.
     let bytes = image::first_frame_png_bytes(&path).map_err(internal_error)?;
     Ok(([(header::CONTENT_TYPE, "image/png")], bytes))
 }
@@ -165,6 +178,7 @@ async fn anonymize_handler(
         .derived_path(&filename, "anon", "dcm")
         .map_err(internal_error)?;
 
+    // Run anonymization in-place and return the new filename for download.
     anonymize::process_file(&path, Some(anon_path)).map_err(internal_error)?;
 
     Ok(Json(json!({ "success": true, "filename": anon_name })))
@@ -220,6 +234,7 @@ async fn download_handler(
 }
 
 fn validation_messages(summary: &ValidationSummary) -> (Vec<String>, Vec<String>) {
+    // Split validation findings into fatal errors and softer warnings for the UI.
     let mut errors = Vec::new();
     if !summary.missing_tags.is_empty() {
         errors.push(format!(

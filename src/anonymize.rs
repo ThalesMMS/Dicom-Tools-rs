@@ -1,3 +1,11 @@
+//
+// anonymize.rs
+// Dicom-Tools-rs
+//
+// Implements deterministic anonymization of DICOM attributes, hashing identifiers and scrubbing PII fields.
+//
+// Thales Matheus Mendonça Santos - November 2025
+
 use anyhow::Result;
 use dicom::core::header::Header;
 use dicom::core::value::PrimitiveValue;
@@ -6,6 +14,7 @@ use dicom::object::{open_file, InMemDicomObject};
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 
+/// Generate a reproducible anonymized identifier by hashing the original value and trimming it.
 fn generate_hash(original: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(original.as_bytes());
@@ -14,7 +23,8 @@ fn generate_hash(original: &str) -> String {
 }
 
 pub fn anonymize_obj(obj: &mut InMemDicomObject) -> Result<()> {
-    // 1. Get original ID to derive a hash
+    // 1. Get original ID to derive a hash.
+    //    We avoid randomization so repeated runs on the same input remain stable.
     let patient_id_tag = Tag(0x0010, 0x0020);
     let original_id = obj
         .element(patient_id_tag)
@@ -25,6 +35,7 @@ pub fn anonymize_obj(obj: &mut InMemDicomObject) -> Result<()> {
     let anon_id = format!("ANON_{}", generate_hash(&original_id));
 
     // 2. Collect tags that need replacement based on VR
+    //    Walking once lets us avoid borrowing issues while editing later.
     let mut replacements = Vec::new();
 
     for elem in obj.iter() {
@@ -57,12 +68,12 @@ pub fn anonymize_obj(obj: &mut InMemDicomObject) -> Result<()> {
         }
     }
 
-    // 3. Apply generic replacements
+    // 3. Apply generic replacements.
     for (tag, vr, val) in replacements {
         obj.put(DataElement::new(tag, vr, PrimitiveValue::from(val)));
     }
 
-    // 4. Apply specific PatientID override
+    // 4. Apply specific PatientID override with the derived hash.
     obj.put(DataElement::new(
         patient_id_tag,
         VR::LO,

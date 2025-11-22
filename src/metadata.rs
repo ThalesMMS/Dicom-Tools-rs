@@ -1,3 +1,11 @@
+//
+// metadata.rs
+// Dicom-Tools-rs
+//
+// Extracts basic and detailed metadata from DICOM objects for CLI summaries and API responses.
+//
+// Thales Matheus Mendonça Santos - November 2025
+
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -10,20 +18,24 @@ use crate::models::{BasicMetadata, DetailedMetadata, PixelFormatSummary};
 use crate::stats;
 
 fn text_for_tag<T: ElementAccess>(obj: &T, tag: Tag) -> Option<String> {
+    // Thin wrapper to keep tag lookups concise in the call sites.
     obj.element_str(tag)
 }
 
 fn uint_for_tag<T: ElementAccess>(obj: &T, tag: Tag) -> Option<u32> {
+    // Numeric values come back as strings; ElementAccess handles the parsing.
     obj.element_u32(tag)
 }
 
 fn insert_if(map: &mut BTreeMap<String, String>, label: &str, value: Option<String>) {
+    // Only materialize present values so the API stays clean of empty fields.
     if let Some(value) = value {
         map.insert(label.to_string(), value);
     }
 }
 
 pub fn extract_basic_metadata<T: ElementAccess>(obj: &T) -> BasicMetadata {
+    // Pull the handful of fields most callers care about without heavy allocation.
     let patient_name = text_for_tag(obj, Tag(0x0010, 0x0010));
     let patient_id = text_for_tag(obj, Tag(0x0010, 0x0020));
     let study_date = text_for_tag(obj, Tag(0x0008, 0x0020));
@@ -50,6 +62,7 @@ pub fn extract_basic_metadata<T: ElementAccess>(obj: &T) -> BasicMetadata {
 }
 
 pub fn extract_detailed_metadata<T: ElementAccess>(obj: &T) -> DetailedMetadata {
+    // Build categorized maps for easier rendering in APIs and the web UI.
     let mut patient = BTreeMap::new();
     insert_if(&mut patient, "Name", text_for_tag(obj, Tag(0x0010, 0x0010)));
     insert_if(&mut patient, "ID", text_for_tag(obj, Tag(0x0010, 0x0020)));
@@ -197,6 +210,7 @@ pub fn print_info(path: &Path, verbose: bool) -> Result<()> {
     }
 
     if verbose {
+        // Verbose mode dumps every element header/value tuple for quick inspection.
         println!("\nALL TAGS (Verbose):");
         for element in obj.iter() {
             println!("  {} : {:?}", element.header().tag, element.value());

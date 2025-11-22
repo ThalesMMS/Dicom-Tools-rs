@@ -1,7 +1,16 @@
+//
+// models.rs
+// Dicom-Tools-rs
+//
+// Defines serializable data structures for metadata, validation, pixel statistics, and histograms.
+//
+// Thales Matheus Mendonça Santos - November 2025
+
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+/// Lightweight fields shown in CLI summaries and quick API responses.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BasicMetadata {
     pub patient_name: Option<String>,
@@ -16,6 +25,7 @@ pub struct BasicMetadata {
     pub number_of_frames: Option<u32>,
 }
 
+/// Expanded, categorized metadata suitable for UI rendering.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DetailedMetadata {
     pub patient: BTreeMap<String, String>,
@@ -24,6 +34,7 @@ pub struct DetailedMetadata {
     pub misc: BTreeMap<String, String>,
 }
 
+/// High-level validation report for required attributes and pixel presence.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValidationSummary {
     pub valid: bool,
@@ -31,6 +42,7 @@ pub struct ValidationSummary {
     pub has_pixel_data: bool,
 }
 
+/// Aggregate statistics over pixel values.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PixelStatistics {
     pub min: f32,
@@ -42,6 +54,7 @@ pub struct PixelStatistics {
     pub shape: Vec<usize>,
 }
 
+/// Histogram buckets alongside the observed range.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PixelHistogram {
     pub bins: Vec<u64>,
@@ -49,6 +62,7 @@ pub struct PixelHistogram {
     pub max: f32,
 }
 
+/// Summary of pixel encoding and VOI/LUT hints.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PixelFormatSummary {
     pub rows: u32,

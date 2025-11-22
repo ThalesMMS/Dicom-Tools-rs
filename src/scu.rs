@@ -1,3 +1,11 @@
+//
+// scu.rs
+// Dicom-Tools-rs
+//
+// Implements minimal C-ECHO and C-STORE service class user operations for testing network connectivity.
+//
+// Thales Matheus Mendonça Santos - November 2025
+
 use anyhow::{Context, Result};
 use dicom::core::{DataElement, PrimitiveValue, Tag, VR};
 use dicom::object::{open_file, InMemDicomObject};
@@ -11,6 +19,7 @@ use dicom::transfer_syntax::TransferSyntaxRegistry;
 // Using generic encoding path which usually works for dicom 0.7
 use dicom::encoding::TransferSyntaxIndex;
 
+/// Perform a DICOM C-ECHO request against the given AE.
 pub fn echo(addr: &str) -> Result<()> {
     println!("Sending C-ECHO to {}", addr);
 
@@ -29,6 +38,7 @@ pub fn echo(addr: &str) -> Result<()> {
         .context("No accepted presentation context for Verification")?;
 
     // Construct C-ECHO-RQ
+    // Command set is a tiny DICOM dataset encoded with the negotiated transfer syntax.
     let mut cmd = InMemDicomObject::new_empty();
     cmd.put(DataElement::new(
         Tag(0x0000, 0x0002),
@@ -80,6 +90,7 @@ pub fn echo(addr: &str) -> Result<()> {
     Ok(())
 }
 
+/// Perform a minimal C-STORE to push a single object to a remote AE.
 pub fn push(addr: &str, file: &Path) -> Result<()> {
     println!("Sending C-STORE for {:?} to {}", file, addr);
 
@@ -107,6 +118,7 @@ pub fn push(addr: &str, file: &Path) -> Result<()> {
         .context("No accepted presentation context for file SOP Class")?;
 
     // Construct C-STORE-RQ
+    // Only the required command elements are included here; dataset follows later as PDV.
     let mut cmd = InMemDicomObject::new_empty();
     cmd.put(DataElement::new(
         Tag(0x0000, 0x0002),
@@ -140,6 +152,7 @@ pub fn push(addr: &str, file: &Path) -> Result<()> {
         .context("Implicit VR Little Endian transfer syntax not found")?;
 
     let mut command_bytes = Vec::new();
+    // Encode command as a command PDV (even though this code path uses the same TS as dataset).
     cmd.write_dataset_with_ts(&mut command_bytes, ts_ivrle)
         .context("Failed to encode command set")?;
 

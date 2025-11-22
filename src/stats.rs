@@ -1,3 +1,11 @@
+//
+// stats.rs
+// Dicom-Tools-rs
+//
+// Computes pixel statistics, histograms, and format summaries from decoded DICOM pixel data.
+//
+// Thales Matheus Mendonça Santos - November 2025
+
 use std::path::Path;
 
 use anyhow::{Context, Result};
@@ -11,6 +19,7 @@ use crate::models::{PixelFormatSummary, PixelHistogram, PixelStatistics};
 pub fn stats(input: &Path) -> Result<()> {
     let stats = pixel_statistics_for_file(input)?;
 
+    // Present data in a CLI-friendly block.
     println!("Statistics for {:?}", input);
     println!("  Shape: {:?}", stats.shape);
     println!("  Min:   {:.2}", stats.min);
@@ -176,6 +185,7 @@ pub fn pixel_format_from_decoded(decoded: &DecodedPixelData) -> Result<PixelForm
 }
 
 fn pixel_values(decoded: &DecodedPixelData) -> Result<(Vec<f32>, Vec<usize>)> {
+    // Apply modality LUT by default to reflect clinician-facing values.
     let options = ConvertOptions::new().with_modality_lut(ModalityLutOption::Default);
     let array = decoded.to_ndarray_with_options::<f32>(&options)?;
     let shape = array.shape().to_vec();

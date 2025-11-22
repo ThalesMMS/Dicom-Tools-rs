@@ -1,3 +1,11 @@
+//
+// image.rs
+// Dicom-Tools-rs
+//
+// Converts decoded DICOM pixel data into standard image formats with optional LUT/VOI handling and frame selection.
+//
+// Thales Matheus Mendonça Santos - November 2025
+
 use anyhow::{bail, Context, Result};
 use dicom::object::open_file;
 use dicom::pixeldata::PixelDecoder;
@@ -6,6 +14,7 @@ use image::{DynamicImage, ImageFormat};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
+/// Options controlling how pixel data is converted into a displayable image.
 #[derive(Debug, Clone, Default)]
 pub struct ImageExportOptions {
     pub frame: Option<u32>,
@@ -25,7 +34,8 @@ pub fn convert(
 ) -> Result<()> {
     let obj = open_file(input).context("Failed to open DICOM file")?;
 
-    // Decode pixel data (handles compression when features are enabled)
+    // Decode pixel data (handles compression when features are enabled).
+    // We do this once and reuse the decoded buffer for any frames requested.
     let decoded_image = obj
         .decode_pixel_data()
         .context("Failed to decode pixel data")?;
@@ -62,6 +72,7 @@ pub fn convert(
         return Ok(());
     }
 
+    // Multi-frame images are expanded into numbered files alongside the base output.
     println!("Multi-frame DICOM detected: {} frames.", num_frames);
     let parent = base_output.parent().unwrap_or_else(|| Path::new("."));
     let stem = base_output.file_stem().unwrap().to_string_lossy();
@@ -82,6 +93,7 @@ pub fn convert(
 
 pub fn first_frame_png_bytes(input: &Path) -> Result<Vec<u8>> {
     let obj = open_file(input)?;
+    // Use the default conversion pipeline to render a thumbnail-friendly PNG.
     let decoded_image = obj.decode_pixel_data()?;
     let dynamic_image = decoded_image.to_dynamic_image(0)?;
     encode_image(&dynamic_image, ImageFormat::Png)
@@ -94,6 +106,7 @@ fn encode_image(image: &DynamicImage, format: ImageFormat) -> Result<Vec<u8>> {
 }
 
 fn build_convert_options(options: &ImageExportOptions) -> ConvertOptions {
+    // Start with default options and opt out of LUTs/VOI transforms depending on flags.
     let mut convert = ConvertOptions::new();
 
     if options.disable_modality_lut {

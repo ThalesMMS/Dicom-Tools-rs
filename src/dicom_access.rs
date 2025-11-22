@@ -1,3 +1,11 @@
+//
+// dicom_access.rs
+// Dicom-Tools-rs
+//
+// Provides a small trait to pull typed values from different DICOM object representations uniformly.
+//
+// Thales Matheus Mendonça Santos - November 2025
+
 use dicom::core::Tag;
 use dicom::dictionary_std::StandardDataDictionary;
 use dicom::object::{DefaultDicomObject, InMemDicomObject};
@@ -12,6 +20,7 @@ pub trait ElementAccess {
 
 impl ElementAccess for DefaultDicomObject {
     fn element_str(&self, tag: Tag) -> Option<String> {
+        // Many tags are optional; convert missing values into clean Option<String>.
         self.element(tag)
             .ok()
             .and_then(|e| e.to_str().ok())
@@ -19,6 +28,7 @@ impl ElementAccess for DefaultDicomObject {
     }
 
     fn element_u32(&self, tag: Tag) -> Option<u32> {
+        // Numeric tags are stored as strings; parse but tolerate errors quietly.
         self.element(tag)
             .ok()
             .and_then(|e| e.to_str().ok())
@@ -36,6 +46,7 @@ impl ElementAccess for DefaultDicomObject {
 
 impl ElementAccess for InMemDicomObject<StandardDataDictionary> {
     fn element_str(&self, tag: Tag) -> Option<String> {
+        // Same implementation as DefaultDicomObject but for the in-memory type.
         self.element(tag)
             .ok()
             .and_then(|e| e.to_str().ok())
@@ -43,6 +54,7 @@ impl ElementAccess for InMemDicomObject<StandardDataDictionary> {
     }
 
     fn element_u32(&self, tag: Tag) -> Option<u32> {
+        // Numeric tags are stored as strings; parse but tolerate errors quietly.
         self.element(tag)
             .ok()
             .and_then(|e| e.to_str().ok())

@@ -1,3 +1,12 @@
+//
+// lib.rs
+// Dicom-Tools-rs
+//
+// Exposes the crate's modules and re-exports the CLI entry point for both binary and library consumers.
+//
+// Thales Matheus Mendonça Santos - November 2025
+
+// Public surface of the library: each module mirrors a CLI verb or shared utility.
 pub mod anonymize;
 pub mod batch;
 pub mod cli;

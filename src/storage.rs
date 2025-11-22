@@ -1,3 +1,11 @@
+//
+// storage.rs
+// Dicom-Tools-rs
+//
+// Provides a safe file store for uploaded/derived DICOM files with path sanitization and hashing.
+//
+// Thales Matheus Mendonça Santos - November 2025
+
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -12,11 +20,13 @@ pub struct FileStore {
 impl FileStore {
     pub fn new(root: impl AsRef<Path>) -> Result<Self> {
         let root = root.as_ref().to_path_buf();
+        // Create the upload directory eagerly so subsequent saves do not fail at runtime.
         fs::create_dir_all(&root).context("Failed to create upload directory")?;
         Ok(Self { root })
     }
 
     pub fn save(&self, original_name: Option<&str>, bytes: &[u8]) -> Result<String> {
+        // Use a sanitized stem plus a content hash to avoid collisions and unsafe paths.
         let stem = original_name
             .and_then(|n| Path::new(n).file_stem().and_then(|s| s.to_str()))
             .map(sanitize_filename)
@@ -39,6 +49,7 @@ impl FileStore {
         let canonical = candidate
             .canonicalize()
             .context("Requested file not found")?;
+        // Guard against path traversal by enforcing the canonical root prefix.
         if !canonical.starts_with(&canonical_root) {
             bail!("Attempt to access file outside storage root");
         }
@@ -64,6 +75,7 @@ impl FileStore {
 }
 
 fn sanitize_filename(input: &str) -> String {
+    // Keep only ASCII word characters and a few safe separators to avoid filesystem surprises.
     input
         .chars()
         .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')

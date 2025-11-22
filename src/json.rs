@@ -1,3 +1,11 @@
+//
+// json.rs
+// Dicom-Tools-rs
+//
+// Handles round-tripping DICOM objects to and from JSON representations for inspection or transformation.
+//
+// Thales Matheus Mendonça Santos - November 2025
+
 use anyhow::{Context, Result};
 use dicom::object::{open_file, InMemDicomObject};
 // Re-export StandardDataDictionary from dicom crate (v0.7 uses dicom_dictionary_std v0.7 internally)
@@ -13,6 +21,7 @@ use std::path::Path;
 
 /// Convert a DICOM file to JSON and print it to stdout.
 pub fn to_json(input: &Path, output: Option<&Path>) -> Result<()> {
+    // Delegate to the pure function so behavior is consistent across CLI and API.
     let json_string = to_json_string(input)?;
 
     match output {
@@ -32,6 +41,7 @@ pub fn to_json(input: &Path, output: Option<&Path>) -> Result<()> {
 pub fn to_json_string(input: &Path) -> Result<String> {
     let obj = open_file(input).context("Failed to open DICOM file")?;
 
+    // The in-memory object implements serde-friendly conversions via dicom-json.
     let inner_obj: &InMemDicomObject<StandardDataDictionary> = &*obj;
     let json_obj = DicomJson::from(inner_obj);
 
@@ -45,6 +55,7 @@ pub fn from_json(input: &Path, output: &Path) -> Result<()> {
     let file = File::open(input).context("Failed to open JSON file")?;
     let json_val: Value = serde_json::from_reader(file).context("Failed to parse JSON")?;
 
+    // Build the in-memory object first so we can attach file meta afterwards.
     let obj: InMemDicomObject<StandardDataDictionary> =
         from_value(json_val).context("Failed to convert JSON to DICOM object")?;
 
@@ -57,6 +68,7 @@ pub fn from_json(input: &Path, output: &Path) -> Result<()> {
     let mut file_obj =
         FileDicomObject::new_empty_with_dict_and_meta(StandardDataDictionary::default(), file_meta);
 
+    // Copy elements into the file object in insertion order.
     for elem in obj {
         file_obj.put(elem);
     }

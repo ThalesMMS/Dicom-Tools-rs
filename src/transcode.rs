@@ -1,3 +1,11 @@
+//
+// transcode.rs
+// Dicom-Tools-rs
+//
+// Transcodes DICOM files to uncompressed transfer syntaxes while preserving raw pixel meaning.
+//
+// Thales Matheus Mendonça Santos - November 2025
+
 use anyhow::{Context, Result};
 use dicom::core::{DataElement, PrimitiveValue, Tag, VR};
 use dicom::object::open_file;
@@ -27,12 +35,14 @@ impl UncompressedTransferSyntax {
 pub fn transcode(input: &Path, output: &Path, target_ts: UncompressedTransferSyntax) -> Result<()> {
     let obj = open_file(input).context("Failed to open DICOM file")?;
 
-    // 1. Decode Pixel Data
+    // 1. Decode Pixel Data.
+    //    We rely on dicom-pixeldata to decompress any encapsulated streams for us.
     let decoded = obj
         .decode_pixel_data()
         .context("Failed to decode pixel data")?;
 
-    // 2. Get raw bytes (native) without applying LUTs
+    // 2. Get raw bytes (native) without applying LUTs.
+    //    This avoids altering pixel meaning while changing transfer syntax.
     let convert_options = ConvertOptions::new()
         .with_modality_lut(ModalityLutOption::None)
         .with_voi_lut(VoiLutOption::Identity);
@@ -51,14 +61,13 @@ pub fn transcode(input: &Path, output: &Path, target_ts: UncompressedTransferSyn
             .context("Failed to convert decoded pixels to vector")?
     };
 
-    // Release borrow on obj so we can consume it
+    // Release borrow on obj so we can consume it.
     drop(decoded);
 
-    // 3. Reconstruct object
+    // 3. Reconstruct object.
     let mut new_obj = obj.into_inner(); // Unwrap the FileDicomObject to get InMemDicomObject
 
-    // Update Pixel Data Element
-    // Tag: 7FE0,0010
+    // Update Pixel Data Element (7FE0,0010) with raw bytes and correct VR.
     let pixel_data_tag = Tag(0x7FE0, 0x0010);
 
     let vr = if bits_allocated > 8 { VR::OW } else { VR::OB };
@@ -69,7 +78,7 @@ pub fn transcode(input: &Path, output: &Path, target_ts: UncompressedTransferSyn
         PrimitiveValue::from(pixel_bytes),
     ));
 
-    // 4. Save with new Transfer Syntax
+    // 4. Save with new Transfer Syntax and regenerated file meta.
 
     use dicom::object::FileDicomObject;
     use dicom::object::FileMetaTableBuilder;

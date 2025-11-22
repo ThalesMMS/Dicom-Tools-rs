@@ -1,3 +1,11 @@
+//
+// cli.rs
+// Dicom-Tools-rs
+//
+// Defines the CLI surface with Clap and dispatches user-selected commands to the corresponding modules.
+//
+// Thales Matheus Mendonça Santos - November 2025
+
 use std::path::PathBuf;
 
 use anyhow::{anyhow, bail};
@@ -6,6 +14,7 @@ use dicom_pixeldata::WindowLevel;
 
 use crate::{anonymize, batch, dump, image, json, metadata, scu, stats, transcode, validate, web};
 
+/// Command-line interface glue code: defines the available verbs and dispatches to modules.
 #[derive(Parser)]
 #[command(name = "dicom-tools")]
 #[command(about = "Ferramentas DICOM em Rust", long_about = None)]
@@ -141,6 +150,7 @@ impl From<TransferSyntax> for transcode::UncompressedTransferSyntax {
 }
 
 pub async fn run() -> anyhow::Result<()> {
+    // Parse the raw CLI arguments once and dispatch to a subcommand handler.
     let cli = Cli::parse();
 
     match cli.command {
@@ -229,6 +239,7 @@ pub async fn run() -> anyhow::Result<()> {
 }
 
 fn parse_window(center: Option<f64>, width: Option<f64>) -> anyhow::Result<Option<WindowLevel>> {
+    // Window requires both center and width to make sense; reject mismatched input early.
     match (center, width) {
         (Some(c), Some(w)) => Ok(Some(WindowLevel {
             center: c,

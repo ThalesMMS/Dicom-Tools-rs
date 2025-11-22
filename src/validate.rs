@@ -1,3 +1,11 @@
+//
+// validate.rs
+// Dicom-Tools-rs
+//
+// Validates critical DICOM attributes and pixel presence, emitting summaries for CLI and API clients.
+//
+// Thales Matheus Mendonça Santos - November 2025
+
 use std::path::Path;
 
 use anyhow::{Context, Result};
@@ -17,6 +25,7 @@ pub struct ValidationReport {
 
 /// Validates a DICOM object in memory.
 pub fn validate_obj<T: ElementAccess>(obj: &T) -> ValidationReport {
+    // Core attributes pulled from PS3.3 C.7.2.1 plus pixel presence.
     let required_tags = vec![
         (Tag(0x0008, 0x0016), "SOP Class UID"),
         (Tag(0x0008, 0x0018), "SOP Instance UID"),
@@ -58,6 +67,7 @@ pub fn check_file(path: &Path) -> Result<()> {
     let obj = open_file(path).context("Failed to open/parse DICOM file")?;
     let meta = obj.meta();
 
+    // Echo key meta info before running attribute-level checks.
     println!("[OK] File Structure Parsed");
     println!("[OK] Transfer Syntax: {}", meta.transfer_syntax());
     println!(

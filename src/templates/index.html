@@ -1,9 +1,18 @@
+<!--
+// index.html
+// Dicom-Tools-rs
+//
+// Single-page web UI for uploading DICOM files, previewing frames, viewing metadata, and running anonymization/validation calls.
+//
+// Thales Matheus Mendonça Santos - November 2025
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DICOM Tools (Rust)</title>
+    <!-- Lightweight single-page UI to exercise the Rust web API without external assets. -->
     <style>
         :root {
             --bg: #0f1829;
@@ -198,14 +207,17 @@
     </div>
 
     <script>
+        // Cache DOM lookups up front to keep later handlers terse and fast.
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
         const viewerContent = document.getElementById('viewerContent');
         const loadingEl = document.getElementById('loading');
         const statusBar = document.getElementById('statusBar');
 
+        // Global-ish UI state: current file name and quick metadata snapshot.
         const state = { currentFilename: null, info: null };
 
+        // Click and drag-drop both funnel through the same upload path.
         uploadArea.addEventListener('click', () => fileInput.click());
         uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
         uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
@@ -218,10 +230,12 @@
         fileInput.addEventListener('change', (e) => { const file = e.target.files[0]; if (file) uploadFile(file); });
 
         function setLoading(active) {
+            // Shared spinner toggle used by most networked actions.
             loadingEl.classList.toggle('active', active);
         }
 
         function updateStatus(text, tone = 'muted') {
+            // Condensed status badges so the user always sees the latest state.
             statusBar.innerHTML = '';
             const pill = document.createElement('span');
             pill.className = 'status-pill active';
@@ -232,6 +246,7 @@
         }
 
         function renderFileInfo(info) {
+            // Populate the small summary grid below the uploader.
             document.getElementById('fileInfo').style.display = 'grid';
             document.getElementById('infoPatient').textContent = info.patient_name || 'N/A';
             document.getElementById('infoModality').textContent = info.modality || 'N/A';
@@ -244,6 +259,7 @@
         }
 
         async function uploadFile(file) {
+            // POST the raw file, then prefetch quick info so the UI can react immediately.
             const formData = new FormData();
             formData.append('file', file);
             setLoading(true);
@@ -270,6 +286,7 @@
         function showPreview() {
             if (!state.currentFilename) return;
             if (state.info && state.info.has_pixel_data) {
+                // Append a cache buster so users see the latest frame even after anonymization.
                 const timestamp = new Date().getTime();
                 viewerContent.innerHTML = `<img src="/api/image/${state.currentFilename}?t=${timestamp}" alt="DICOM frame">`;
             } else {
@@ -282,6 +299,7 @@
             viewerContent.innerHTML = '<p style="text-align:center;color:var(--muted);">Loading metadata…</p>';
 
             try {
+                // Fetch categorized metadata sections and render them as cards.
                 const response = await fetch(`/api/metadata/${state.currentFilename}`);
                 const data = await response.json();
                 let html = '<h3>Metadata</h3>';
@@ -310,6 +328,7 @@
             viewerContent.innerHTML = '<p style="text-align:center;color:var(--muted);">Calculating pixel statistics…</p>';
 
             try {
+                // Pixel statistics are precomputed server-side to avoid heavy browser work.
                 const response = await fetch(`/api/stats/${state.currentFilename}`);
                 const data = await response.json();
                 const stats = [
@@ -332,6 +351,7 @@
                 viewerContent.innerHTML = '<div class="alert error">Failed to compute statistics.</div>';
             }
 
+        // Render the DICOM JSON representation returned by the server.
         async function showJson() {
             if (!state.currentFilename) return alert('Load a file first.');
             viewerContent.innerHTML = '<p style="text-align:center;color:var(--muted);">Generating JSON…</p>';
@@ -364,6 +384,7 @@
             updateStatus('Anonymizing…');
 
             try {
+                // Request a server-side anonymized copy, then trigger a download.
                 const response = await fetch(`/api/anonymize/${state.currentFilename}`, { method: 'POST' });
                 const data = await response.json();
                 if (!data.success) throw new Error(data.error || 'Anonymization failed');
@@ -383,6 +404,7 @@
             viewerContent.innerHTML = '<p style="text-align:center;color:var(--muted);">Validating…</p>';
 
             try {
+                // Validation returns both hard errors (missing tags) and softer warnings.
                 const response = await fetch(`/api/validate/${state.currentFilename}`);
                 const data = await response.json();
                 let html = '';

@@ -1,3 +1,11 @@
+//
+// dump.rs
+// Dicom-Tools-rs
+//
+// Renders a human-readable dump of a DICOM dataset, including sequences, with configurable depth and value previews.
+//
+// Thales Matheus Mendonça Santos - November 2025
+
 use std::fmt::Write;
 use std::path::Path;
 
@@ -16,6 +24,7 @@ pub fn dump_file(path: &Path, max_depth: usize, max_value_len: usize) -> Result<
 }
 
 pub fn dump_to_string(path: &Path, max_depth: usize, max_value_len: usize) -> Result<String> {
+    // Loading and dumping are separated so the output can be reused in tests or APIs.
     let obj = open_file(path).context("Failed to open DICOM file")?;
     let mut out = String::new();
     dump_object(&obj, 0, max_depth, max_value_len, &mut out);
@@ -30,6 +39,7 @@ fn dump_object(
     out: &mut String,
 ) {
     for elem in obj.iter() {
+        // Collect all metadata needed to render the line.
         let tag = elem.header().tag;
         let vr = elem.header().vr;
         let name = tag_name(tag);
@@ -37,6 +47,7 @@ fn dump_object(
 
         match elem.value() {
             Value::Primitive(p) => {
+                // Primitive values can be long; we surface a preview only.
                 let preview = preview_primitive(p, max_value_len);
                 let _ = writeln!(
                     out,
@@ -49,6 +60,7 @@ fn dump_object(
                 );
             }
             Value::Sequence(seq) => {
+                // For sequences, print the container then recurse into items (if allowed by depth).
                 let _ = writeln!(
                     out,
                     "{}{} {} {} [sequence: {} item(s)]",
@@ -66,6 +78,7 @@ fn dump_object(
                 }
             }
             Value::PixelSequence(p) => {
+                // Encapsulated pixel data is summarized to avoid massive output.
                 let _ = writeln!(
                     out,
                     "{}{} {} {} [encapsulated: {} fragment(s)]",
